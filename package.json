@@ -340,9 +340,8 @@
     "test:e2e": "node scripts/esbuild.mjs --production && tsc -p ./test/e2e/tsconfig.json && node ./out/test/e2e/test/e2e/runTest",
     "lint": "eslint --config eslint.config.mjs src test/parser",
     "check": "tsc --noEmit && npm run lint && npm run test",
-    "build": "node scripts/esbuild.mjs --production && vsce package",
-    "bump": "sh ./scripts/bump.sh",
-    "publish:marketplace": "node scripts/publish.mjs"
+    "build": "node scripts/build.mjs",
+    "bump": "sh ./scripts/bump.sh"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

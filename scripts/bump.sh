@@ -2,8 +2,8 @@
 # Version management script for TidyJS
 # Usage:
 #   ./scripts/bump.sh                  Interactive mode
-#   ./scripts/bump.sh minor            Ask version type, prompt for git/publish
-#   ./scripts/bump.sh minor --yes      Fully non-interactive: bump + build + commit + tag + push + publish
+#   ./scripts/bump.sh minor            Ask version type, prompt for git steps
+#   ./scripts/bump.sh minor --yes      Fully non-interactive: bump + build + commit + tag + push
 
 set -e
 
@@ -96,8 +96,8 @@ fi
 
 printf "${GREEN}✓ Version updated in package.json${NC}\n"
 
-# Git commit, tag, push, publish
-if confirm "Build, commit, tag, push, and publish?"; then
+# Git commit, tag, push
+if confirm "Build, commit, tag, and push?"; then
   # Clean old .vsix files
   printf "${BLUE}► Cleaning old .vsix files...${NC}\n"
   rm -f *.vsix
@@ -124,20 +124,6 @@ if confirm "Build, commit, tag, push, and publish?"; then
     printf "${GREEN}✓ Pushed to GitHub${NC}\n"
   else
     printf "${YELLOW}► Kept locally. Push later: git push origin main && git push origin v$NEW_VERSION${NC}\n"
-  fi
-
-  # Publish (delegates to publish.mjs which handles .env + vsce)
-  if confirm "Publish to VS Code Marketplace?"; then
-    printf "${BLUE}► Publishing to Marketplace...${NC}\n"
-    node scripts/publish.mjs
-
-    if [ $? -eq 0 ]; then
-      printf "${GREEN}✓ TidyJS v$NEW_VERSION published${NC}\n"
-    else
-      printf "${RED}✗ Publish failed. Upload manually: $VSIX_FILE${NC}\n"
-      printf "  https://marketplace.visualstudio.com/manage/publishers/asmir\n"
-      exit 1
-    fi
   fi
 else
   printf "${GREEN}✓ Version updated (no commit)${NC}\n"
