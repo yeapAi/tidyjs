@@ -6,12 +6,13 @@ import { DiagnosticsUnavailableError } from './diagnostic-errors';
 import { EslintDiagnosticsProvider } from './eslint-diagnostics';
 
 import type { ChildProcess } from 'child_process';
-import type { EslintEditorSettings, EslintLintResult } from './eslint-diagnostics';
+import type { EslintEditorSettings, EslintFixResult, EslintLintResult } from './eslint-diagnostics';
 
 export const ESLINT_HOST_FLAG = '--tidyjs-internal-eslint-host';
 
 export interface EslintLinter {
     lint(filePath: string, text: string, workspaceRoot: string | undefined): Promise<EslintLintResult>;
+    fixAll(filePath: string, text: string, workspaceRoot: string | undefined): Promise<EslintFixResult>;
     warm(filePath: string, workspaceRoot: string | undefined): void;
     prefetch(files: { filePath: string; workspaceRoot: string | undefined }[]): void;
     dispose(): void;
@@ -27,10 +28,11 @@ type HostRequest =
     | { type: 'init'; settings: EslintEditorSettings }
     | { type: 'warm'; filePath: string; workspaceRoot: string | undefined }
     | { type: 'lint'; id: number; filePath: string; text: string; workspaceRoot: string | undefined }
+    | { type: 'fixAll'; id: number; filePath: string; text: string; workspaceRoot: string | undefined }
     | { type: 'lintFile'; id: number; filePath: string; workspaceRoot: string | undefined };
 
 type HostResponse =
-    | { id: number; result: EslintLintResult; digest?: string }
+    | { id: number; result: EslintLintResult | EslintFixResult; digest?: string }
     | { id: number; error: { message: string; unavailable: boolean }; digest?: string };
 
 export function runEslintHost(): void {
@@ -66,7 +68,10 @@ export function runEslintHost(): void {
             }
             let response: HostResponse;
             try {
-                response = { id: message.id, result: await provider.lint(message.filePath, text, message.workspaceRoot), digest };
+                const result = message.type === 'fixAll'
+                    ? await provider.fixAll(message.filePath, text, message.workspaceRoot)
+                    : await provider.lint(message.filePath, text, message.workspaceRoot);
+                response = { id: message.id, result, digest };
             } catch (error) {
                 response = {
                     id: message.id,
@@ -85,7 +90,7 @@ export function runEslintHost(): void {
 
 export class RemoteEslintLinter implements EslintLinter {
     private readonly child: ChildProcess;
-    private readonly pending = new Map<number, { resolve: (result: EslintLintResult) => void; reject: (error: Error) => void; digest?: (digest: string | undefined) => void }>();
+    private readonly pending = new Map<number, { resolve: (result: never) => void; reject: (error: Error) => void; digest?: (digest: string | undefined) => void }>();
     private readonly prefetched = new Map<string, Promise<{ digest: string | undefined; outcome: { ok: true; result: EslintLintResult } | { ok: false; error: Error } }>>();
     private nextId = 0;
     private exitError: Error | undefined;
@@ -100,7 +105,7 @@ export class RemoteEslintLinter implements EslintLinter {
             this.pending.delete(response.id);
             waiter.digest?.(response.digest);
             if ('result' in response) {
-                waiter.resolve(response.result);
+                waiter.resolve(response.result as never);
             } else if (response.error.unavailable) {
                 waiter.reject(new DiagnosticsUnavailableError('eslint', response.error.message));
             } else {
@@ -133,7 +138,7 @@ export class RemoteEslintLinter implements EslintLinter {
                 let digest: string | undefined;
                 this.pending.set(id, {
                     digest: (value) => { digest = value; },
-                    resolve: (result) => settle({ digest, outcome: { ok: true, result } }),
+                    resolve: (result: EslintLintResult) => settle({ digest, outcome: { ok: true, result } }),
                     reject: (error) => settle({ digest, outcome: { ok: false, error } }),
                 });
                 this.child.send({ type: 'lintFile', id, filePath, workspaceRoot } satisfies HostRequest);
@@ -153,13 +158,21 @@ export class RemoteEslintLinter implements EslintLinter {
                 throw outcome.error;
             }
         }
+        return this.request<EslintLintResult>({ type: 'lint', filePath, text, workspaceRoot });
+    }
+
+    fixAll(filePath: string, text: string, workspaceRoot: string | undefined): Promise<EslintFixResult> {
+        return this.request<EslintFixResult>({ type: 'fixAll', filePath, text, workspaceRoot });
+    }
+
+    private request<Result>(message: { type: 'lint' | 'fixAll'; filePath: string; text: string; workspaceRoot: string | undefined }): Promise<Result> {
         if (this.exitError) {
-            throw this.exitError;
+            return Promise.reject(this.exitError);
         }
         const id = this.nextId++;
         return new Promise((resolve, reject) => {
             this.pending.set(id, { resolve, reject });
-            this.child.send({ type: 'lint', id, filePath, text, workspaceRoot } satisfies HostRequest);
+            this.child.send({ ...message, id } satisfies HostRequest);
         });
     }
 

@@ -4,7 +4,7 @@ import { DiagnosticsUnavailableError } from './diagnostic-errors';
 import type { ParserResult } from '../parser';
 import type { TidyDiagnostic } from '../core/diagnostics';
 import type { DiagnosticsSource } from './diagnostic-errors';
-import type { EslintDiagnosticsProvider, EslintLintResult } from './eslint-diagnostics';
+import type { EslintDiagnosticsProvider, EslintFixResult, EslintLintResult } from './eslint-diagnostics';
 import type { EslintLinter } from './eslint-host';
 import type { TypeScriptDiagnosticsProvider } from './typescript-diagnostics';
 
@@ -38,6 +38,10 @@ export class LocalEslintLinter implements EslintLinter {
         return this.provider.lint(filePath, text, workspaceRoot);
     }
 
+    fixAll(filePath: string, text: string, workspaceRoot: string | undefined): Promise<EslintFixResult> {
+        return this.provider.fixAll(filePath, text, workspaceRoot);
+    }
+
     warm(): void {
         return;
     }
@@ -69,6 +73,10 @@ export class LazyEslintLinter implements EslintLinter {
 
     lint(filePath: string, text: string, workspaceRoot: string | undefined): Promise<EslintLintResult> {
         return this.instance().lint(filePath, text, workspaceRoot);
+    }
+
+    fixAll(filePath: string, text: string, workspaceRoot: string | undefined): Promise<EslintFixResult> {
+        return this.instance().fixAll(filePath, text, workspaceRoot);
     }
 
     warm(filePath: string, workspaceRoot: string | undefined): void {

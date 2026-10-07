@@ -43,7 +43,7 @@ The parser, the IR, the formatter, the sorters and the re-export organizer did n
 - **Missing modules**: severity `Error`, code `2307` or `2318`, and a message matching `Cannot find module '…'`. The module name comes from the message, not from the position.
 - **Unused names**: severity `Error`, `Warning` or `Hint` (not `Information`), code `6133`, `6192`, `6196`, `unused-import`, `import-not-used` or `@typescript-eslint/no-unused-vars`, and a message matching `'X' is declared|defined but (its value is )never read|used`. Only names that are actually imported are kept.
 
-The parser then drops whole imports whose source is missing and individual specifiers whose local name is unused. Positions are never used. Two consequences matter for parity:
+The parser then drops whole imports whose source is missing and individual specifiers whose local name is unused. In 1.9.2, positions were never used; both runtimes now check them (section 6, core fixes). Two consequences matter for parity:
 
 - `6192` (`All imports in import declaration are unused.`) never matches the message pattern. An import whose specifiers are all unused is only removed when another source, such as ESLint, reports each name.
 - The pattern is English. When VS Code runs the TypeScript server in another locale (`typescript.locale`), TypeScript-only removal does nothing in the editor.
@@ -62,10 +62,10 @@ The parser then drops whole imports whose source is missing and individual speci
 ### Features that depend on VS Code state
 
 - **Timing of diagnostics.** The editor reads what is already published. If the TypeScript server or ESLint has not finished, nothing is removed at that save. The CLI computes complete diagnostics, which matches the editor once its servers have settled.
-- **User-level settings.** `getConfiguration` merges user settings from the VS Code profile. The CLI reads only the workspace `.vscode/settings.json`, because user settings are machine-specific and would make CI runs non-reproducible.
+- **User-level settings.** `getConfiguration` merges user settings from the VS Code profile. The CLI reads only the workspace `.vscode/settings.json`, because user settings are machine-specific and would make results differ between machines.
 - **TypeScript server plugins and project heuristics.** tsserver may load plugins declared in `compilerOptions.plugins` and uses an inferred project for files outside any tsconfig. The CLI reproduces project selection and inferred options but loads no plugin.
 - **Localized messages.** Covered above.
-- **ESLint extension settings.** `eslint.workingDirectories`, `eslint.enable`, `eslint.validate` and `eslint.options` are read from `.vscode/settings.json`. `eslint.rules.customizations` and the extension's probing heuristics are not reproduced.
+- **ESLint extension settings.** `eslint.workingDirectories`, `eslint.enable`, `eslint.validate`, `eslint.probe`, `eslint.options`, `eslint.useFlatConfig`, `eslint.quiet`, `eslint.nodePath` and `eslint.rules.customizations` are read from `.vscode/settings.json` and applied as the ESLint extension does. The only remaining difference concerns the extension's cache of `eslint.rules.customizations` (section 6).
 
 ## 2. Options considered for diagnostics
 
@@ -73,7 +73,7 @@ The parser then drops whole imports whose source is missing and individual speci
 |---|---|---|---|
 | Reliability | Deterministic: diagnostics are computed, not awaited | Depends on server readiness; the 1.9.2 parity bench needed waits for both TypeScript and ESLint | As A, plus B's flakiness when enabled |
 | Performance | One program per tsconfig, reused across files | Electron start, extension host, project load for every run | As A |
-| Installation | `typescript` and `eslint` from the project, `typescript` bundled as fallback | VS Code binary, a display server on Linux CI, ESLint extension installed in the test profile | Both |
+| Installation | `typescript` and `eslint` from the project | VS Code binary, a display server on Linux CI, ESLint extension installed in the test profile | Both |
 | Portability | Any Node 20+ platform supported by `oxc-parser` | Electron platforms only; headless Linux needs `xvfb` | Both |
 | Reproducibility | Same inputs, same output | Depends on profile, extensions and timing | Mixed |
 | CI/CD | Native | Heavy and fragile | Optional |
@@ -113,7 +113,7 @@ The ESLint configuration of this repository forbids importing `vscode` outside `
 |---|---|---|
 | Core | `src/parser.ts`, `src/formatter.ts`, `src/ir/`, `src/destructuring-sorter.ts`, `src/reexport-organizer.ts`, `src/batch-formatter.ts`, `src/utils/*`, `src/core/config.ts`, `src/core/settings.ts`, `src/core/diagnostics.ts`, `src/core/pipeline.ts` | `oxc-parser`, `jsonc-parser`, Node `fs`/`path` |
 | VS Code adapter | `src/extension.ts`, `src/vscode/config-manager.ts`, `src/vscode/config-loader.ts`, `src/vscode/diagnostics.ts`, `src/vscode/log-sink.ts`, `src/vscode/messages.ts` | `vscode` and the core |
-| CLI adapter | `src/cli/main.ts`, `cli.ts`, `args.ts`, `workspace.ts`, `files.ts`, `runner.ts`, `reporter.ts`, `diagnostics.ts`, `typescript-diagnostics.ts`, `eslint-diagnostics.ts` | the core, the project's `typescript` and `eslint` at runtime |
+| CLI adapter | `src/cli/main.ts`, `cli.ts`, `args.ts`, `workspace.ts`, `files.ts`, `git.ts`, `runner.ts`, `reporter.ts`, `parallel.ts`, `diagnostics.ts`, `diagnostic-errors.ts`, `typescript-diagnostics.ts`, `tsconfig-cache.ts`, `import-oracle.ts`, `eslint-diagnostics.ts`, `eslint-host.ts` | the core, the project's `typescript` and `eslint` at runtime |
 
 The abstractions shared by both adapters:
 
@@ -149,6 +149,8 @@ Each row was observed or checked with the compatibility suite (`test/compat`) or
 | User settings | Environment | No, by design | Yes | The CLI reads `<root>/.vscode/settings.json` and the extension defaults, not the user profile. |
 | Multi-root workspaces | Environment | Yes, with `--root` | Yes | The CLI has one root per run. |
 | `eslint.rules.customizations` cache | Environment | No | Yes | The extension caches an override per rule regardless of `fixable`; the CLI evaluates every message. Both give the same severity unless a rule mixes fixable and non-fixable reports with a `fixable` filter. |
+| ESLint fixes in `problems` mode | Environment | No | Yes | With `eslint.codeActionsOnSave.mode` set to `problems`, the editor applies the fixes it has already computed for the document. The CLI applies none and warns; in the default `all` mode it applies the same fixes as the editor. |
+| TypeScript fixes and missing imports on save | Not reproduced | Yes | Yes | `source.fixAll` also runs the TypeScript fixes, and `source.addMissingImports` adds imports. The CLI only reproduces `source.fixAll.eslint`. |
 | Concurrent edits | Environment | Not applicable | Yes | The editor abandons and retries when the document changes during formatting; files on disk do not change during a run. |
 
 ### Behaviors of 1.9.2 kept identical in both runtimes
@@ -206,7 +208,7 @@ The fast analysis reads `tsconfig.json` through `src/cli/tsconfig-cache.ts`. It 
 
 ```text
 tidyjs ──┬── main process: config, TypeScript (classic API or TypeScript 7 native API), formatting
-         ├── ESLint host process: the project's ESLint, started at launch, linting while TypeScript checks
+         ├── ESLint host process: the project's ESLint, started by the first file that needs it (at launch with --no-fast-analysis), linting while TypeScript checks
          └── worker processes (--jobs): each one runs the two lines above on a contiguous slice of the files
 ```
 

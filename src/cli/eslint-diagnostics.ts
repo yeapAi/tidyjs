@@ -50,6 +50,13 @@ export interface EslintEditorSettings {
     quiet: boolean;
     nodePath?: string;
     customizations: RuleCustomization[];
+    codeActionsOnSave: EslintSaveSettings;
+}
+
+export interface EslintSaveSettings {
+    mode: string;
+    rules?: string[];
+    options?: Record<string, unknown>;
 }
 
 export interface WorkingDirectory {
@@ -64,6 +71,12 @@ export interface EslintLintResult {
     diagnostics: TidyDiagnostic[];
     workingDirectory?: string;
     eslintPath?: string;
+}
+
+export interface EslintFixResult {
+    status: EslintFileStatus;
+    output?: string;
+    workingDirectory?: string;
 }
 
 interface EslintMessage {
@@ -93,7 +106,7 @@ function computeLineStarts(text: string): number[] {
 }
 
 interface EslintInstance {
-    lintText(code: string, options: { filePath: string; warnIgnored?: boolean }): Promise<{ messages: EslintMessage[] }[]>;
+    lintText(code: string, options: { filePath: string; warnIgnored?: boolean }): Promise<{ messages: EslintMessage[]; output?: string }[]>;
     calculateConfigForFile?(filePath: string): Promise<unknown>;
 }
 
@@ -104,7 +117,7 @@ interface EslintModule {
     ESLint?: EslintConstructor;
 }
 
-function languageIdFor(filePath: string): string {
+export function languageIdFor(filePath: string): string {
     const extension = path.extname(filePath).toLowerCase();
     switch (extension) {
         case '.ts':
@@ -122,6 +135,22 @@ function languageIdFor(filePath: string): string {
 
 function asBoolean(value: unknown): boolean | undefined {
     return typeof value === 'boolean' ? value : undefined;
+}
+
+function asObject(value: unknown): Record<string, unknown> | undefined {
+    return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+}
+
+export function isRuleOffOnSave(ruleId: string, patterns: string[]): boolean {
+    for (const pattern of patterns) {
+        if (pattern.startsWith('!') && new RegExp(`^${pattern.slice(1).replace(/\*/g, '.*')}$`).test(ruleId)) {
+            return true;
+        }
+        if (new RegExp(`^${pattern.replace(/\*/g, '.*')}$`).test(ruleId)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 export function readEslintEditorSettings(reader: SettingsReader): EslintEditorSettings {
@@ -152,18 +181,25 @@ export function readEslintEditorSettings(reader: SettingsReader): EslintEditorSe
             }];
         })
         : [];
+    const saveMode = reader.get<unknown>('codeActionsOnSave.mode');
+    const saveRules = reader.get<unknown>('codeActionsOnSave.rules');
 
     return {
         enable: asBoolean(reader.get('enable')) ?? true,
         validate,
         probe,
         workingDirectories: Array.isArray(workingDirectories) ? workingDirectories : undefined,
-        options: typeof options === 'object' && options !== null && !Array.isArray(options) ? options as Record<string, unknown> : {},
+        options: asObject(options) ?? {},
         useFlatConfig: asBoolean(reader.get('useFlatConfig')),
         experimentalUseFlatConfig: asBoolean(reader.get('experimental.useFlatConfig')) === true,
         quiet: asBoolean(reader.get('quiet')) ?? false,
         nodePath: typeof nodePath === 'string' ? nodePath : undefined,
         customizations,
+        codeActionsOnSave: {
+            mode: typeof saveMode === 'string' ? saveMode : 'all',
+            rules: Array.isArray(saveRules) ? saveRules.filter((rule): rule is string => typeof rule === 'string') : undefined,
+            options: asObject(reader.get<unknown>('codeActionsOnSave.options')),
+        },
     };
 }
 
@@ -429,7 +465,7 @@ export class EslintDiagnosticsProvider {
         return undefined;
     }
 
-    private async createInstance(libraryPath: string, workingDirectory: WorkingDirectory | undefined): Promise<EslintInstance> {
+    private async createInstance(libraryPath: string, workingDirectory: WorkingDirectory | undefined, fixOptions?: Record<string, unknown>): Promise<EslintInstance> {
         const library = createRequire(libraryPath)(libraryPath) as EslintModule;
         const EslintClass = typeof library.loadESLint === 'function'
             ? await library.loadESLint({ useFlatConfig: this.settings.useFlatConfig })
@@ -438,9 +474,12 @@ export class EslintDiagnosticsProvider {
             throw new DiagnosticsUnavailableError('eslint', `${libraryPath} does not expose the ESLint class API`);
         }
 
-        const options: Record<string, unknown> = { ...this.settings.options };
+        const options: Record<string, unknown> = { ...this.settings.options, ...fixOptions };
         if (workingDirectory) {
             options.cwd = workingDirectory.directory;
+        }
+        if (fixOptions) {
+            return new EslintClass(options);
         }
 
         try {
@@ -475,14 +514,70 @@ export class EslintDiagnosticsProvider {
         });
     }
 
-    private instanceFor(libraryPath: string, workingDirectory: WorkingDirectory | undefined): Promise<EslintInstance> {
-        const cacheKey = `${libraryPath}\0${workingDirectory?.directory ?? ''}\0${workingDirectory?.changeProcessCwd ?? false}`;
+    private instanceFor(libraryPath: string, workingDirectory: WorkingDirectory | undefined, fixOptions?: Record<string, unknown>): Promise<EslintInstance> {
+        const cacheKey = `${libraryPath}\0${workingDirectory?.directory ?? ''}\0${workingDirectory?.changeProcessCwd ?? false}\0${fixOptions ? JSON.stringify(fixOptions) : ''}`;
         let instancePromise = this.instances.get(cacheKey);
         if (!instancePromise) {
-            instancePromise = this.createInstance(libraryPath, workingDirectory);
+            instancePromise = this.createInstance(libraryPath, workingDirectory, fixOptions);
             this.instances.set(cacheKey, instancePromise);
         }
         return instancePromise;
+    }
+
+    private locate(filePath: string, workspaceRoot: string | undefined): { workingDirectory: WorkingDirectory | undefined; libraryPath: string | undefined } {
+        const { workingDirectory, configured } = resolveEslintWorkingDirectory(filePath, workspaceRoot, this.settings);
+        const resolveFrom = !configured || !workingDirectory || !workingDirectory.changeProcessCwd
+            ? path.dirname(filePath)
+            : workingDirectory.directory;
+        return { workingDirectory, libraryPath: this.resolveLibrary(resolveFrom, workspaceRoot) };
+    }
+
+    private async rulesOffOnSave(libraryPath: string, workingDirectory: WorkingDirectory | undefined, filePath: string): Promise<string[]> {
+        const patterns = this.settings.codeActionsOnSave.rules;
+        if (patterns === undefined) {
+            return [];
+        }
+        const instance = await this.instanceFor(libraryPath, workingDirectory);
+        const config = await instance.calculateConfigForFile?.(filePath) as { rules?: Record<string, unknown> } | undefined;
+        const ruleIds = Object.keys(config?.rules ?? {});
+        return patterns.length === 0 ? ruleIds : ruleIds.filter((ruleId) => isRuleOffOnSave(ruleId, patterns));
+    }
+
+    async fixAll(filePath: string, text: string, workspaceRoot: string | undefined): Promise<EslintFixResult> {
+        const skipped = this.shouldValidate(filePath);
+        if (skipped) {
+            return { status: skipped };
+        }
+        if (this.settings.codeActionsOnSave.mode !== 'all') {
+            throw new DiagnosticsUnavailableError('eslint', `eslint.codeActionsOnSave.mode "${this.settings.codeActionsOnSave.mode}" applies the fixes the editor has already computed and is not reproduced`);
+        }
+
+        const { workingDirectory, libraryPath } = this.locate(filePath, workspaceRoot);
+        if (!libraryPath) {
+            return { status: 'not-installed', workingDirectory: workingDirectory?.directory };
+        }
+
+        return withWorkingDirectory(workingDirectory, async () => {
+            try {
+                const offRules = await this.rulesOffOnSave(libraryPath, workingDirectory, filePath);
+                const fixOptions: Record<string, unknown> = { fix: true, ...this.settings.codeActionsOnSave.options };
+                if (offRules.length > 0) {
+                    fixOptions.overrideConfig = { rules: Object.fromEntries(offRules.map((ruleId) => [ruleId, 'off'])) };
+                }
+                const instance = await this.instanceFor(libraryPath, workingDirectory, fixOptions);
+                const results = await instance.lintText(text, { filePath, warnIgnored: false });
+                if (results.length === 0) {
+                    return { status: 'ignored', workingDirectory: workingDirectory?.directory };
+                }
+                return { status: 'linted', output: results[0].output, workingDirectory: workingDirectory?.directory };
+            } catch (error) {
+                if (isMissingConfigError(error)) {
+                    return { status: 'not-configured', workingDirectory: workingDirectory?.directory };
+                }
+                const message = error instanceof Error ? error.message.split('\n')[0] : String(error);
+                throw new DiagnosticsUnavailableError('eslint', `ESLint fixes failed: ${message}`);
+            }
+        });
     }
 
     async lint(filePath: string, text: string, workspaceRoot: string | undefined): Promise<EslintLintResult> {
@@ -491,11 +586,7 @@ export class EslintDiagnosticsProvider {
             return { status: skipped, diagnostics: [] };
         }
 
-        const { workingDirectory, configured } = resolveEslintWorkingDirectory(filePath, workspaceRoot, this.settings);
-        const resolveFrom = !configured || !workingDirectory || !workingDirectory.changeProcessCwd
-            ? path.dirname(filePath)
-            : workingDirectory.directory;
-        const libraryPath = this.resolveLibrary(resolveFrom, workspaceRoot);
+        const { workingDirectory, libraryPath } = this.locate(filePath, workspaceRoot);
         if (!libraryPath) {
             return { status: 'not-installed', diagnostics: [], workingDirectory: workingDirectory?.directory };
         }

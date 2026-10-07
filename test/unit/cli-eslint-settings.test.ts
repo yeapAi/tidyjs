@@ -2,7 +2,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-import { readEslintEditorSettings, resolveEslintWorkingDirectory } from '../../src/cli/eslint-diagnostics';
+import { isRuleOffOnSave, readEslintEditorSettings, resolveEslintWorkingDirectory } from '../../src/cli/eslint-diagnostics';
+import { codeActionsRunEslintFixAll } from '../../src/cli/workspace';
 import { createSettingsReader, settingsTreeFromFlatEntries, getSettingsSection } from '../../src/core/settings';
 
 function settings(entries: Record<string, unknown>) {
@@ -99,5 +100,33 @@ describe('readEslintEditorSettings', () => {
     test('defaults match the extension', () => {
         expect(settings({})).toMatchObject({ enable: true, validate: undefined, quiet: false, options: {}, customizations: [] });
         expect(settings({}).probe).toEqual(expect.arrayContaining(['javascript', 'javascriptreact', 'typescript', 'typescriptreact']));
+    });
+});
+
+describe('ESLint fixes on save', () => {
+    test('codeActionsOnSave runs the ESLint fixes for source.fixAll.eslint or source.fixAll', () => {
+        expect(codeActionsRunEslintFixAll({ 'source.fixAll.eslint': 'explicit' })).toBe(true);
+        expect(codeActionsRunEslintFixAll({ 'source.fixAll.eslint': true })).toBe(true);
+        expect(codeActionsRunEslintFixAll({ 'source.fixAll': 'always' })).toBe(true);
+        expect(codeActionsRunEslintFixAll(['source.fixAll.eslint'])).toBe(true);
+        expect(codeActionsRunEslintFixAll({ 'source.fixAll': 'explicit', 'source.fixAll.eslint': 'never' })).toBe(false);
+        expect(codeActionsRunEslintFixAll({ 'source.organizeImports': 'explicit' })).toBe(false);
+        expect(codeActionsRunEslintFixAll(undefined)).toBe(false);
+    });
+
+    test('eslint.codeActionsOnSave.rules keeps a rule only when its first matching pattern is positive', () => {
+        expect(isRuleOffOnSave('no-debugger', ['*'])).toBe(false);
+        expect(isRuleOffOnSave('no-debugger', ['!no-*', '*'])).toBe(true);
+        expect(isRuleOffOnSave('@typescript-eslint/consistent-type-imports', ['@typescript-eslint/*'])).toBe(false);
+        expect(isRuleOffOnSave('no-debugger', ['@typescript-eslint/*'])).toBe(true);
+    });
+
+    test('reads eslint.codeActionsOnSave with the extension defaults', () => {
+        expect(settings({}).codeActionsOnSave).toEqual({ mode: 'all', rules: undefined, options: undefined });
+        expect(settings({
+            'eslint.codeActionsOnSave.mode': 'problems',
+            'eslint.codeActionsOnSave.rules': ['*'],
+            'eslint.codeActionsOnSave.options': { fixTypes: ['layout'] },
+        }).codeActionsOnSave).toEqual({ mode: 'problems', rules: ['*'], options: { fixTypes: ['layout'] } });
     });
 });

@@ -18,7 +18,7 @@ Complete documentation for the TidyJS VS Code extension for organizing and forma
 - [**Re-export Organization**](reexport-organizer.md) — Automatic grouping, sorting, and alignment of re-exports (`export { ... } from '...'`).
 - [**Ignore Pragma**](ignore-pragma.md) — Syntax for excluding an entire file from TidyJS formatting.
 - [**Batch Formatting**](batch-formatting.md) — Automatic formatting of all files in a folder or workspace with a detailed report.
-- [**CLI**](cli.md) — Run TidyJS from a terminal or CI with the TypeScript and ESLint diagnostics computed by the CLI.
+- [**CLI**](cli.md) — Run TidyJS from a terminal or from `yarn commit` in Yeap-UI-Apps, with the TypeScript and ESLint diagnostics computed by the CLI.
 
 ### Internal Pipeline
 

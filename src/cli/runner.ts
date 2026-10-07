@@ -8,6 +8,7 @@ import type { ParserResult } from '../parser';
 import type { Config } from '../types';
 import type { FormatProfile } from '../core/pipeline';
 import type { CliDiagnostics, SourceReport } from './diagnostics';
+import type { EslintLinter } from './eslint-host';
 import type { CliWorkspace } from './workspace';
 
 export type RunMode = 'list' | 'check' | 'write';
@@ -28,6 +29,7 @@ export interface FileReport {
     removedUnused: string[];
     removedMissing: string[];
     sources: SourceReport[];
+    eslintFixes?: 'applied' | 'none';
 }
 
 export interface RunnerOptions {
@@ -44,7 +46,8 @@ export class FileRunner {
     constructor(
         private readonly workspace: CliWorkspace,
         private readonly diagnostics: CliDiagnostics | undefined,
-        private readonly options: RunnerOptions
+        private readonly options: RunnerOptions,
+        private readonly eslint?: EslintLinter
     ) {}
 
     dispose(): void {
@@ -91,7 +94,9 @@ export class FileRunner {
             return this.fail(report, 'config', `Invalid configuration${report.configPath ? ` (${report.configPath})` : ''}: ${validation.errors.join(' ')}`);
         }
 
-        if (isFileInExcludedFolder(filePath, config, workspaceRoot)) {
+        const excluded = isFileInExcludedFolder(filePath, config, workspaceRoot);
+        const eslintFixesOnSave = this.options.profile === 'editor' && this.eslint !== undefined && this.workspace.eslintFixAllOnSave(filePath);
+        if (excluded && !eslintFixesOnSave) {
             report.status = 'skipped';
             report.reason = 'excluded';
             return report;
@@ -105,7 +110,17 @@ export class FileRunner {
         }
 
         const hasBom = raw.startsWith(BOM);
-        const text = hasBom ? raw.slice(1) : raw;
+        const original = hasBom ? raw.slice(1) : raw;
+        const text = eslintFixesOnSave ? await this.applyEslintFixes(filePath, original, workspaceRoot, report) : original;
+
+        if (excluded) {
+            if (text === original) {
+                report.status = 'skipped';
+                report.reason = 'excluded';
+                return report;
+            }
+            return this.complete(report, filePath, original, text, hasBom);
+        }
 
         const collectDiagnostics = this.options.profile === 'editor' && this.diagnostics && needsDiagnostics(config)
             ? async (initialResult: ParserResult) => {
@@ -153,20 +168,38 @@ export class FileRunner {
             if (outcome.parseError) {
                 return this.fail(report, 'parse', outcome.parseError);
             }
+            if (text !== original) {
+                return this.complete(report, filePath, original, text, hasBom);
+            }
             report.status = outcome.reason === 'ignored' || outcome.reason === 'empty' ? 'skipped' : 'unchanged';
             report.reason = outcome.reason;
             return report;
         }
 
+        return this.complete(report, filePath, original, outcome.text, hasBom);
+    }
+
+    private async applyEslintFixes(filePath: string, text: string, workspaceRoot: string | undefined, report: FileReport): Promise<string> {
+        try {
+            const { output } = await this.eslint!.fixAll(filePath, text, workspaceRoot);
+            report.eslintFixes = output !== undefined && output !== text ? 'applied' : 'none';
+            return output ?? text;
+        } catch (error) {
+            report.warnings.push(`ESLint fixes were not applied: ${error instanceof Error ? error.message : String(error)}`);
+            return text;
+        }
+    }
+
+    private async complete(report: FileReport, filePath: string, original: string, formatted: string, hasBom: boolean): Promise<FileReport> {
         report.status = 'changed';
         if (this.options.keepContents) {
-            report.original = text;
-            report.formatted = outcome.text;
+            report.original = original;
+            report.formatted = formatted;
         }
 
         if (this.options.mode === 'write') {
             try {
-                await fs.promises.writeFile(filePath, hasBom ? BOM + outcome.text : outcome.text, 'utf8');
+                await fs.promises.writeFile(filePath, hasBom ? BOM + formatted : formatted, 'utf8');
                 report.written = true;
             } catch (error) {
                 return this.fail(report, 'write', `Failed to write file: ${error instanceof Error ? error.message : String(error)}`);

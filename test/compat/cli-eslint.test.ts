@@ -15,6 +15,19 @@ export default [{
 }];
 `;
 
+const FIX_CONFIG = `import tseslint from 'typescript-eslint';
+export default [{
+    files: ['**/*.ts'],
+    languageOptions: { parser: tseslint.parser },
+    plugins: { '@typescript-eslint': tseslint.plugin },
+    rules: { '@typescript-eslint/consistent-type-imports': 'error' },
+}];
+`;
+
+const TYPE_SOURCE = "import { Stats, statSync } from 'fs';\n\nexport const stat = (file: string): Stats => statSync(file);\n";
+const TYPE_FIXED = "// Other\nimport { statSync }   from 'fs';\nimport type { Stats } from 'fs';\n\nexport const stat = (file: string): Stats => statSync(file);\n";
+const TYPE_FORMATTED_ONLY = "// Other\nimport {\n    Stats,\n    statSync\n}            from 'fs';\n\nexport const stat = (file: string): Stats => statSync(file);\n";
+
 const SOURCE = "import { join, resolve } from 'path';\nimport { readFileSync } from 'fs';\n\nexport const read = readFileSync;\n";
 const WITHOUT_UNUSED = "// Other\nimport { readFileSync } from 'fs';\n\nexport const read = readFileSync;\n";
 const ONLY_FORMATTED = "// Other\nimport { readFileSync } from 'fs';\nimport {\n    join,\n    resolve\n}                       from 'path';\n\nexport const read = readFileSync;\n";
@@ -102,6 +115,51 @@ describe('ESLint diagnostics through the built CLI', () => {
     ])('ESLint diagnostics are not used when %s', (_label, settings) => {
         setup({ eslintConfig: ESLINT_CONFIG, settings });
         expect(run().output).toBe(ONLY_FORMATTED);
+    });
+
+    describe('ESLint fixes on save', () => {
+        function runWithTypeSource(settings: Record<string, unknown>): ReturnType<typeof run> {
+            setup({ eslintConfig: FIX_CONFIG, settings });
+            write('src/a.ts', TYPE_SOURCE);
+            return run();
+        }
+
+        test('source.fixAll.eslint applies the ESLint fixes before TidyJS, as a save in VS Code does', () => {
+            const result = runWithTypeSource({ 'editor.codeActionsOnSave': { 'source.fixAll.eslint': 'explicit' } });
+
+            expect(result.status).toBe(0);
+            expect(result.stdout).toContain('eslint fixes: applied');
+            expect(result.output).toBe(TYPE_FIXED);
+        });
+
+        test('source.fixAll includes the ESLint fixes', () => {
+            expect(runWithTypeSource({ 'editor.codeActionsOnSave': { 'source.fixAll': 'explicit' } }).output).toBe(TYPE_FIXED);
+        });
+
+        test.each([
+            ['no code action runs on save', {}],
+            ['source.fixAll.eslint is never', { 'editor.codeActionsOnSave': { 'source.fixAll': 'explicit', 'source.fixAll.eslint': 'never' } }],
+            ['a language override disables it', {
+                'editor.codeActionsOnSave': { 'source.fixAll.eslint': 'explicit' },
+                '[typescript]': { 'editor.codeActionsOnSave': { 'source.fixAll.eslint': 'never' } },
+            }],
+            ['eslint.codeActionsOnSave.rules turns the rule off', {
+                'editor.codeActionsOnSave': { 'source.fixAll.eslint': 'explicit' },
+                'eslint.codeActionsOnSave.rules': ['!@typescript-eslint/consistent-type-imports', '*'],
+            }],
+        ])('ESLint fixes are not applied when %s', (_label, settings) => {
+            expect(runWithTypeSource(settings).output).toBe(TYPE_FORMATTED_ONLY);
+        });
+
+        test('the problems mode is reported and not reproduced', () => {
+            const result = runWithTypeSource({
+                'editor.codeActionsOnSave': { 'source.fixAll.eslint': 'explicit' },
+                'eslint.codeActionsOnSave.mode': 'problems',
+            });
+
+            expect(result.stderr).toContain('ESLint fixes were not applied');
+            expect(result.output).toBe(TYPE_FORMATTED_ONLY);
+        });
     });
 
     test('a customization that upgrades the rule keeps the removal', () => {

@@ -107,9 +107,19 @@ const config = {
     ],
 };
 
+const oxcRequirePlugin = {
+    name: 'oxc-require',
+    setup(build) {
+        build.onLoad({ filter: /[\\/]oxc-parser[\\/]src-js[\\/].*\.js$/ }, async (args) => ({
+            contents: (await fs.promises.readFile(args.path, 'utf8')).replace(/^const require = createRequire\(import\.meta\.url\);$/m, ''),
+            loader: 'js',
+        }));
+    },
+};
+
 /**
  * CLI configuration — ESM for Node.
- * oxc-parser stays external so npm installs the binding of the running platform.
+ * oxc-parser is bundled like in the extension, its native binding is copied to dist/.
  * typescript and eslint are resolved from the formatted project at runtime.
  * @type {import('esbuild').BuildOptions}
  */
@@ -124,7 +134,7 @@ const cliConfig = {
     target: ['node20'],
     outfile: 'dist/cli-main.js',
     mainFields: ['module', 'main'],
-    external: ['oxc-parser', 'typescript', 'eslint'],
+    external: ['typescript', 'eslint'],
     banner: { js: "#!/usr/bin/env node\nimport { createRequire as __tidyjsCreateRequire } from 'module';\nconst require = __tidyjsCreateRequire(import.meta.url);" },
     define: {
         TIDYJS_PACKAGE: JSON.stringify({
@@ -135,7 +145,7 @@ const cliConfig = {
     },
     logLevel: 'silent',
     legalComments: 'none',
-    plugins: [esbuildProblemMatcherPlugin],
+    plugins: [oxcRequirePlugin, esbuildProblemMatcherPlugin],
 };
 
 function writeCliLauncher() {

@@ -84,7 +84,7 @@ function createSession(options: SessionOptions): Session {
         mode: args.mode,
         profile: args.profile,
         keepContents: args.diff,
-    });
+    }, eslint);
 
     return {
         run: (filePath) => runner.run(filePath),

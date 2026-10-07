@@ -82,6 +82,9 @@ export class Reporter {
                 const details = [source.detail, source.location ? this.display(source.location) : undefined].filter(Boolean).join(', ');
                 this.output.stdout(`    ${source.source}: ${source.status}${details ? ` (${details})` : ''}, ${source.count} diagnostic(s)\n`);
             }
+            if (report.eslintFixes) {
+                this.output.stdout(`    eslint fixes: ${report.eslintFixes}\n`);
+            }
             if (report.status === 'changed' && report.removedUnused.length > 0) {
                 this.output.stdout(`    unused names: ${report.removedUnused.join(', ')}\n`);
             }

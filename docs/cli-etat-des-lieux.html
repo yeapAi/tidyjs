@@ -478,10 +478,10 @@ pre.code .key:hover { text-decoration-color: var(--accent); }
   <a class="skip-link" href="#section-1">Aller à la première section</a>
 
   <header id="intro" class="container-prose page-header" data-rail-label="Introduction">
-    <h1>La CLI TidyJS fonctionne et rend le même texte que VS Code, mais rien n'est commité et sa vitesse dépend encore des diagnostics.</h1>
+    <h1>La CLI TidyJS rend le même texte que VS Code, est commitée sur une branche de POC, et le chemin rapide traite un fichier Yeap en 0,13 s.</h1>
     <div class="lead">
-      <p>Ce document fait l'état des lieux de la session « CLI exploration » du 6 octobre 2026 (de 19 h 32 à 23 h 41). Il s'appuie sur le transcript de la session, sur le code présent dans le dépôt et sur des contrôles relancés le 7 octobre 2026. Chaque chiffre indique sa provenance : <strong>revérifié le 7 octobre</strong>, ou <strong>mesuré pendant la session</strong> et repris de son transcript.</p>
-      <p>Le travail est sur la branche <code>main</code>, sans commit, sans branche dédiée et sans publication npm. <code>git status</code> montre 32 fichiers suivis modifiés ou supprimés, dont <code>src/utils/config.ts</code>, <code>configLoader.ts</code> et <code>diagnostics-cache.ts</code>. Les nouveaux dossiers <code>src/core/</code>, <code>src/cli/</code>, <code>src/vscode/</code> et <code>test/compat/</code> ne sont pas suivis, pas plus que onze nouveaux fichiers de test.</p>
+      <p>Ce document fait l'état des lieux de la session « CLI exploration » du 6 octobre 2026 (de 19 h 32 à 23 h 41), complété par le travail du 7 octobre : alignement des versions sur Yeap-UI-Apps, réduction du démarrage à froid et repli à deux étages. Il s'appuie sur le transcript de la session, sur <code>plans/cli.md</code>, sur le code du commit <code>d855937</code> et sur des contrôles relancés le 7 octobre 2026. Chaque chiffre indique sa provenance : <strong>revérifié le 7 octobre</strong>, <strong>mesuré le 7 octobre après intégration</strong> et repris de <code>plans/cli.md</code>, ou <strong>mesuré pendant la session</strong> et repris de son transcript.</p>
+      <p>Tout le travail tient dans un commit, <code>d855937</code> (« run TidyJS outside VS Code with editor-identical results »), sur la branche <code>poc/headless-tidy</code> partie de <code>main</code> (<code>d90321e</code>). La branche est poussée sur <code>origin</code> (<code>yeapAi/tidyjs</code>), sans pull request. Le commit supprime <code>src/utils/config.ts</code>, <code>configLoader.ts</code> et <code>diagnostics-cache.ts</code>, et ajoute <code>src/core/</code>, <code>src/cli/</code>, <code>src/vscode/</code> et <code>test/compat/</code>.</p>
       <p class="callout">La section 01 décrit ce qui existe, la 02 ce qu'il faut pour formater, la 03 le trajet d'un fichier. La 04 donne les preuves, la 05 le bilan des pistes gardées ou refusées, et la 06 ce qu'on peut encore tenter et ce qui reste à décider.</p>
     </div>
   </header>
@@ -504,7 +504,7 @@ pre.code .key:hover { text-decoration-color: var(--accent); }
         </div>
         <div class="card accent-border">
           <div class="id">jest · 7 oct.</div>
-          <div class="value">92 suites, 1 092 tests<span class="note">, contre 77 et 864 avant la session</span></div>
+          <div class="value">93 suites, 1 109 tests<span class="note">, contre 77 et 864 avant la session</span></div>
         </div>
         <div class="card">
           <div class="id">e2e extension · session</div>
@@ -521,19 +521,20 @@ pre.code .key:hover { text-decoration-color: var(--accent); }
             <tr><td class="muted">core</td><td>src/core/pipeline.ts</td><td>333</td><td>formatSource : profils editor / folder, cache de parsers sensible aux regex</td></tr>
             <tr><td class="muted">core</td><td>src/utils/path-resolver.ts</td><td>428 (+87 / −378)</td><td>une seule implémentation Node pour l'éditeur, le dossier et la CLI ; tsconfig lu en JSONC avec extends</td></tr>
             <tr><td class="muted">vscode</td><td>src/vscode/*.ts</td><td>307</td><td>config-manager, config-loader, diagnostics (vscode.Diagnostic → TidyDiagnostic), log-sink, messages</td></tr>
-            <tr><td class="muted">cli</td><td>src/cli/cli.ts, args.ts, main.ts</td><td>435</td><td>entrée, options, session, workers, ordre déterministe des rapports</td></tr>
-            <tr><td class="muted">cli</td><td>src/cli/typescript-diagnostics.ts</td><td>726</td><td>LanguageService classique, API native TS 7, sélection de projet façon tsserver, projet inféré</td></tr>
+            <tr><td class="muted">cli</td><td>src/cli/cli.ts, args.ts, main.ts</td><td>439</td><td>entrée, options, session, workers, ordre déterministe des rapports, transfert brut d'oxc-parser</td></tr>
+            <tr><td class="muted">cli</td><td>src/cli/typescript-diagnostics.ts</td><td>772</td><td>LanguageService classique, API native TS 7, sélection de projet façon tsserver, projet inféré, analyse du fichier seul</td></tr>
+            <tr><td class="muted">cli</td><td>src/cli/tsconfig-cache.ts</td><td>183</td><td>cache disque de la lecture des tsconfig pour le chemin rapide, validé par date et taille des fichiers lus et des dossiers parcourus</td></tr>
             <tr><td class="muted">cli</td><td>src/cli/eslint-diagnostics.ts</td><td>542</td><td>ESLint du projet, algorithme de l'extension ESLint (workingDirectories, customizations, validate, probe…)</td></tr>
             <tr><td class="muted">cli</td><td>src/cli/eslint-host.ts</td><td>171</td><td>ESLint dans un processus séparé, prélecture avec contrôle d'empreinte</td></tr>
-            <tr><td class="muted">cli</td><td>src/cli/import-oracle.ts</td><td>287</td><td>analyse rapide des imports (section 03)</td></tr>
-            <tr><td class="muted">cli</td><td>src/cli/diagnostics.ts, runner.ts, reporter.ts, files.ts, workspace.ts, git.ts, parallel.ts</td><td>775</td><td>collecte, traitement par fichier, rapport, cibles et globs, racine, --changed / --staged, pool de workers</td></tr>
+            <tr><td class="muted">cli</td><td>src/cli/import-oracle.ts</td><td>314</td><td>analyse rapide des imports sur l'AST d'oxc-parser (section 03)</td></tr>
+            <tr><td class="muted">cli</td><td>src/cli/diagnostics.ts, diagnostic-errors.ts, runner.ts, reporter.ts, files.ts, workspace.ts, git.ts, parallel.ts</td><td>818</td><td>collecte et repli à deux étages, traitement par fichier, rapport, cibles et globs, racine, --changed / --staged, pool de workers</td></tr>
             <tr><td class="muted">tests</td><td>test/compat/</td><td>—</td><td>fixtures, sorties enregistrées dans VS Code, harnais d'enregistrement, test CLI contre VS Code</td></tr>
             <tr><td class="muted">docs</td><td>docs/cli.md, docs/cli-architecture.md</td><td>—</td><td>usage et architecture, en anglais comme le reste de docs/</td></tr>
           </tbody>
         </table>
       </div>
       <div class="callout stack">
-        <p><strong>Packaging préparé, rien de publié.</strong> <code>package.json</code> déclare <code>bin.tidyjs = ./dist/cli.js</code>, <code>engines.node &gt;= 20</code> et un <code>prepack</code> qui construit en production. <code>typescript</code> passe des devDependencies aux dependencies, pour servir de copie de secours. Un <code>.npmignore</code> ne livre que <code>dist/cli.js</code>, les deux docs CLI et le schéma. <code>.vscodeignore</code> exclut la CLI du <code>.vsix</code>.</p>
+        <p><strong>La CLI est livrée dans le <code>.vsix</code>, pas sur npm.</strong> Ce dépôt est le fork <code>yeapAi/tidyjs</code> de <code>blksmr/tidyjs</code>, dédié à Yeap-UI-Apps. <code>dist/cli.js</code> (le lanceur, qui active le cache de compilation V8) et <code>dist/cli-main.js</code> (le bundle, avec <code>oxc-parser</code> et son binaire natif) entrent dans le <code>.vsix</code> distribué par Drive : la CLI a toujours la version de l'extension de l'éditeur. Les champs <code>bin</code>, <code>engines.node</code>, <code>prepack</code> et le <code>.npmignore</code>, prévus pour une publication npm, ont été retirés, et <code>typescript</code> est revenu en devDependency.</p>
         <p>Le même jour, une autre session a créé le ticket ClickUp TICKET-25347, « TidyJS : exécution en ligne de commande (CLI) », en Technical Story. Une session lancée à 22 h 50 avec <code>/plan</code> s'est arrêtée après l'exploration, sans rien modifier.</p>
       </div>
     </div>
@@ -546,7 +547,7 @@ pre.code .key:hover { text-decoration-color: var(--accent); }
     </header>
     <div class="container-prose prose">
       <p>TidyJS a deux besoins distincts. <strong>Trier, grouper et aligner</strong> est purement syntaxique : le fichier et sa configuration suffisent. <strong>Supprimer des imports</strong> (<code>removeUnusedImports</code>, <code>removeMissingModules</code>) exige de savoir ce que TypeScript et ESLint diraient du fichier. Dans VS Code, ces réponses viennent des diagnostics déjà publiés par l'éditeur. La CLI doit les calculer elle-même. Les deux options valent <code>false</code> par défaut, dans <code>src/core/config.ts</code> comme dans le <code>package.json</code>.</p>
-      <p>Le bundle <code>dist/cli.js</code> (1,37 Mo, ESM, avec shebang) embarque <code>jsonc-parser</code>, <code>tinyglobby</code>, <code>diff</code>, <code>@typescript-eslint/typescript-estree</code> et <code>@typescript-eslint/scope-manager</code>. Trois paquets restent externes et sont résolus à l'exécution : <code>oxc-parser</code>, <code>typescript</code> et <code>eslint</code>.</p>
+      <p>Le bundle <code>dist/cli-main.js</code> (ESM, avec shebang), chargé par le lanceur <code>dist/cli.js</code>, embarque <code>oxc-parser</code> (son binaire natif est copié dans <code>dist/</code>), <code>jsonc-parser</code>, <code>tinyglobby</code>, <code>diff</code> et <code>@typescript-eslint/scope-manager</code>. <code>@typescript-eslint/typescript-estree</code> n'y est plus : l'oracle travaille sur l'AST d'oxc-parser. Deux paquets restent externes et sont résolus depuis le projet à l'exécution : <code>typescript</code> et <code>eslint</code>.</p>
       <p>Le tableau ci-dessous a été vérifié le 7 octobre sur un projet jetable, sans <code>typescript</code> ni <code>eslint</code>, et sur une copie isolée du bundle.</p>
     </div>
     <div class="container-wide block stack">
@@ -554,10 +555,10 @@ pre.code .key:hover { text-decoration-color: var(--accent); }
         <table class="data-table">
           <thead><tr><th>niveau</th><th>prérequis</th><th>sinon</th><th>preuve</th></tr></thead>
           <tbody>
-            <tr><td class="accent">0 · formater</td><td>Node ≥ 20 (champ engines ; testé en v22.22.2)</td><td>non testé sous 20</td><td class="muted">package.json</td></tr>
-            <tr class="denied-row"><td class="accent">0 · formater</td><td>paquet oxc-parser et son binding natif pour la plateforme</td><td class="denied">la CLI ne démarre pas</td><td class="muted">copie isolée de cli.js : ERR_MODULE_NOT_FOUND 'oxc-parser'</td></tr>
+            <tr><td class="accent">0 · formater</td><td>Node ≥ 20 (cible du bundle ; testé en v22.22.2)</td><td>non testé sous 20</td><td class="muted">scripts/esbuild.mjs</td></tr>
+            <tr class="denied-row"><td class="accent">0 · formater</td><td>binaire natif d'oxc-parser pour la plateforme, embarqué dans dist/ (celui de la machine qui construit le .vsix)</td><td class="denied">la CLI ne démarre pas sur une autre plateforme</td><td class="muted">copie isolée de dist/, sans node_modules : formatage et diagnostics OK</td></tr>
             <tr><td class="accent">0 · formater</td><td>fichiers .ts .tsx .js .jsx ; config facultative</td><td>défauts : un groupe « Other », aucune suppression</td><td class="muted">projet jetable sans config : tri et alignement appliqués</td></tr>
-            <tr><td class="accent">1 · supprimer</td><td>TypeScript : celui du projet, sinon la copie de TidyJS (6.0.3 depuis l'alignement sur Yeap ; 5.9.3 lors du test)</td><td>avertissement, rien n'est retiré</td><td class="muted">projet sans TS : « inferred project, TypeScript 5.9.3 »</td></tr>
+            <tr><td class="accent">1 · supprimer</td><td>TypeScript : celui du projet (pas de copie de secours dans le .vsix ; dans un checkout de TidyJS, sa copie 6.0.3, 5.9.3 lors du test)</td><td>avertissement, rien n'est retiré</td><td class="muted">projet sans TS : « inferred project, TypeScript 5.9.3 »</td></tr>
             <tr class="denied-row"><td class="accent">1 · supprimer</td><td>dépendances du projet installées (node_modules)</td><td class="denied">removeMissingModules retire des imports valides</td><td class="muted">react absent : import retiré, useState laissé sans import</td></tr>
             <tr><td class="accent">1 · supprimer</td><td>tsconfig.json ou jsconfig.json qui inclut le fichier</td><td>projet inféré avec les options de VS Code 1.140</td><td class="muted">module Preserve, moduleResolution Bundler, jsx react-jsx, strict</td></tr>
             <tr><td class="accent">2 · parité VS Code</td><td>ESLint du projet (jamais embarqué), facultatif</td><td>silencieux, comme VS Code sans ESLint ; TS seul</td><td class="muted">« eslint: unavailable (not-installed) »</td></tr>
@@ -578,36 +579,36 @@ missing modules: react, ./missing
 -import x from './missing';
  export const v = useState;</code></pre>
       </div>
-      <p class="callout denied">Ce comportement n'est pas propre à la CLI : <code>removeMissingModules</code> retire l'import entier dont la source est introuvable, et VS Code ferait de même avec les mêmes diagnostics. Une fois un faux <code>react</code> installé dans <code>node_modules</code>, seuls <code>./missing</code>, <code>b</code>, <code>useEffect</code> et <code>x</code> sont retirés. Lancer la CLI avant <code>npm install</code>, en CI par exemple, est donc dangereux dès que cette option est active.</p>
+      <p class="callout denied">Ce comportement n'est pas propre à la CLI : <code>removeMissingModules</code> retire l'import entier dont la source est introuvable, et VS Code ferait de même avec les mêmes diagnostics. Une fois un faux <code>react</code> installé dans <code>node_modules</code>, seuls <code>./missing</code>, <code>b</code>, <code>useEffect</code> et <code>x</code> sont retirés. Lancer la CLI avant <code>yarn install</code>, après un changement de branche par exemple, est donc dangereux dès que cette option est active. Le script <code>scripts/tidyjs.ts</code> de Yeap-UI-Apps s'arrête pour cette raison quand <code>node_modules/.yarn-integrity</code> ne correspond pas à <code>yarn.lock</code>.</p>
     </div>
   </section>
 
   <section id="section-3" class="section" data-rail-label="03 Trajet">
     <header class="container-prose">
       <a class="section-number" href="#section-3">03</a>
-      <h2>Un oracle tranche la plupart des fichiers ; les cas douteux passent par TypeScript et ESLint complets.</h2>
+      <h2>Un oracle tranche la plupart des fichiers ; les cas douteux passent par TypeScript sur le fichier seul, puis par le programme complet.</h2>
     </header>
     <div class="container-prose prose">
       <p>La CLI résout d'abord la config du fichier avec le code de l'extension. Ensuite, si une suppression est active et que le fichier a des imports, elle cherche quels imports sont inutilisés ou introuvables. Le core reçoit des <code>TidyDiagnostic</code> et ne sait pas d'où ils viennent. Depuis la correction faite pendant la session, un diagnostic n'est retenu que s'il pointe dans la déclaration d'import qui lie le nom.</p>
-      <p><strong>L'oracle</strong> (<code>src/cli/import-oracle.ts</code>) compte les références de chaque import avec <code>@typescript-eslint/scope-manager</code>, l'analyse de portée d'ESLint. Il résout chaque module avec <code>ts.resolveModuleName</code> et les <code>declare module</code> ambiants du projet. Un import sans référence reçoit un 6133 synthétique, placé sur l'import. Comme VS Code retire tout nom signalé par TypeScript ou par ESLint, ESLint n'a alors pas besoin de tourner.</p>
-      <p><strong>Le fichier passe en analyse complète</strong> dès qu'un des critères suivants est vrai :</p>
+      <p><strong>L'oracle</strong> (<code>src/cli/import-oracle.ts</code>) compte les références de chaque import avec <code>@typescript-eslint/scope-manager</code>, l'analyse de portée d'ESLint, appliquée à l'AST d'oxc-parser. Il résout chaque module avec <code>ts.resolveModuleName</code> et les <code>declare module</code> ambiants du projet. Un import sans référence reçoit un 6133 synthétique, placé sur l'import. Comme VS Code retire tout nom signalé par TypeScript ou par ESLint, ESLint n'a alors pas besoin de tourner.</p>
+      <p><strong>Le fichier passe en analyse du fichier seul</strong> quand tous ses modules se résolvent et qu'un des critères suivants est vrai :</p>
       <ul>
         <li>fichier <code>.d.ts</code> ;</li>
         <li>directive <code>@ts-check</code> ou <code>@ts-nocheck</code> ;</li>
         <li>option <code>noCheck</code>, ou JS avec <code>checkJs: false</code> ;</li>
         <li>suggestions TypeScript désactivées sans <code>noUnusedLocals</code> ;</li>
-        <li>erreur de parsing ;</li>
         <li>nom cité dans <code>{@link}</code> (en .ts) ou dans des accolades JSDoc (en .js) ;</li>
         <li>fabrique JSX en mode classique, ou import réassigné ;</li>
-        <li>import à plusieurs liaisons, toutes inutilisées (TypeScript émet alors un 6192 sans nom) ;</li>
-        <li>module qui ne se résout pas.</li>
+        <li>import à plusieurs liaisons, toutes inutilisées (TypeScript émet alors un 6192 sans nom).</li>
       </ul>
-      <p>Ces critères ont été mesurés sur TypeScript 5.9 et 6.0.</p>
+      <p>TypeScript vérifie alors un service qui ne contient que ce fichier (<code>noResolve</code>, <code>noLib</code>, <code>types: []</code>, les autres options du projet), et l'ESLint du projet le lint en parallèle. Avec seulement <code>removeMissingModules</code>, rien ne tourne : aucun module ne manque.</p>
+      <p><strong>Le fichier passe en analyse complète</strong> si un module ne se résout pas, si le fichier ne se parse pas, ou si <code>emitDecoratorMetadata</code> est actif et que le fichier contient des décorateurs. Ces critères ont été mesurés sur TypeScript 5.9 et 6.0.</p>
     </div>
     <div class="container-wide block">
       <div class="stack">
         <div class="chips" data-tabs="trajet">
           <button type="button" class="chip" aria-pressed="true" data-target="trajet-rapide">chemin rapide (défaut)</button>
+          <button type="button" class="chip" aria-pressed="false" data-target="trajet-fichier">repli fichier seul</button>
           <button type="button" class="chip" aria-pressed="false" data-target="trajet-complet">repli complet</button>
           <button type="button" class="chip" aria-pressed="false" data-target="trajet-sans">sans diagnostics</button>
         </div>
@@ -635,14 +636,38 @@ missing modules: react, ./missing
             <text class="t-main" x="683" y="88" text-anchor="middle">reparse puis sortie</text>
             <text class="t-sub" x="683" y="106" text-anchor="middle">liste, --diff, --write</text>
             <path class="edge denied" d="M 265 134 L 265 172 L 400 172" marker-end="url(#arrow-denied)"/>
-            <text class="t-denied" x="410" y="176">cas incertain : repli complet</text>
+            <text class="t-denied" x="410" y="176">cas incertain : repli fichier seul ou complet</text>
+          </svg>
+        </div>
+        <div class="diagram" id="trajet-fichier" hidden>
+          <svg viewBox="0 0 780 220" role="img" aria-label="Repli fichier seul">
+            <rect class="node denied" x="8" y="76" width="120" height="64" rx="6"/>
+            <text class="t-denied" x="68" y="104" text-anchor="middle">oracle</text>
+            <text class="t-sub" x="68" y="122" text-anchor="middle">modules résolus</text>
+            <path class="edge" d="M 128 98 L 176 52" marker-end="url(#arrow-default)"/>
+            <path class="edge" d="M 128 118 L 176 164" marker-end="url(#arrow-default)"/>
+            <rect class="node" x="180" y="16" width="220" height="64" rx="6"/>
+            <text class="t-main" x="290" y="44" text-anchor="middle">TypeScript, fichier seul</text>
+            <text class="t-sub" x="290" y="62" text-anchor="middle">noResolve, noLib, types: []</text>
+            <rect class="node" x="180" y="136" width="220" height="64" rx="6"/>
+            <text class="t-main" x="290" y="164" text-anchor="middle">ESLint du projet</text>
+            <text class="t-sub" x="290" y="182" text-anchor="middle">processus hôte, en parallèle</text>
+            <path class="edge accent" d="M 400 48 L 452 98" marker-end="url(#arrow-accent)"/>
+            <path class="edge accent" d="M 400 168 L 452 118" marker-end="url(#arrow-accent)"/>
+            <rect class="node accent" x="456" y="76" width="150" height="64" rx="6"/>
+            <text class="t-accent" x="531" y="104" text-anchor="middle">TidyDiagnostic[]</text>
+            <text class="t-sub" x="531" y="122" text-anchor="middle">noms inutilisés</text>
+            <path class="edge" d="M 606 108 L 644 108" marker-end="url(#arrow-default)"/>
+            <rect class="node" x="648" y="76" width="124" height="64" rx="6"/>
+            <text class="t-main" x="710" y="104" text-anchor="middle">moteur</text>
+            <text class="t-sub" x="710" y="122" text-anchor="middle">puis sortie</text>
           </svg>
         </div>
         <div class="diagram" id="trajet-complet" hidden>
           <svg viewBox="0 0 780 220" role="img" aria-label="Repli complet">
             <rect class="node denied" x="8" y="76" width="120" height="64" rx="6"/>
             <text class="t-denied" x="68" y="104" text-anchor="middle">oracle</text>
-            <text class="t-sub" x="68" y="122" text-anchor="middle">non tranché</text>
+            <text class="t-sub" x="68" y="122" text-anchor="middle">module non résolu</text>
             <path class="edge" d="M 128 98 L 176 52" marker-end="url(#arrow-default)"/>
             <path class="edge" d="M 128 118 L 176 164" marker-end="url(#arrow-default)"/>
             <rect class="node" x="180" y="16" width="220" height="64" rx="6"/>
@@ -677,7 +702,7 @@ missing modules: react, ./missing
             <text class="t-sub" x="672" y="74" text-anchor="middle">ni TypeScript ni ESLint</text>
           </svg>
         </div>
-        <p class="callout neutral">Le chemin rapide ne s'active que si TypeScript et ESLint sont tous deux autorisés. Avec <code>--no-eslint</code>, la condition <code>this.typescript &amp;&amp; this.eslint</code> de <code>src/cli/diagnostics.ts</code> est fausse et l'analyse TypeScript est toujours complète. Pour un projet en TypeScript 7, l'oracle ne s'applique pas non plus, faute d'API JavaScript classique : tout passe par l'API native. <code>--no-diagnostics</code> ou <code>--profile folder</code> sautent tout le calcul.</p>
+        <p class="callout neutral">Le chemin rapide ne s'active que si TypeScript et ESLint sont tous deux autorisés. Avec <code>--no-eslint</code> ou <code>--no-fast-analysis</code>, la condition <code>this.fastAnalysis &amp;&amp; this.typescript &amp;&amp; this.eslint</code> de <code>src/cli/diagnostics.ts</code> est fausse et l'analyse TypeScript est toujours complète. Pour un projet en TypeScript 7, ni l'oracle ni l'analyse du fichier seul ne s'appliquent, faute d'API JavaScript classique : tout passe par l'API native. <code>--no-diagnostics</code> ou <code>--profile folder</code> sautent tout le calcul.</p>
       </div>
     </div>
   </section>
@@ -685,7 +710,7 @@ missing modules: react, ./missing
   <section id="section-4" class="section" data-rail-label="04 Preuves">
     <header class="container-prose">
       <a class="section-number" href="#section-4">04</a>
-      <h2>Tous les fichiers comparés sont identiques à VS Code, mais la CLI reste en secondes face aux millisecondes de l'éditeur.</h2>
+      <h2>Tous les fichiers comparés sont identiques à VS Code, et la CLI passe sous 0,15 s par fichier, contre 14 ms dans l'éditeur déjà démarré.</h2>
     </header>
     <div class="container-prose prose">
       <p>La parité se mesure sur le fichier entier, octet par octet, contre la sortie de l'extension enregistrée dans un vrai VS Code 1.140 (<code>test/compat/vscode/record.mjs</code>). Le banc attend que les diagnostics de TypeScript et d'ESLint soient stables, lance Format Document et enregistre le résultat. Sur Yeap-UI-Apps, la moitié des fichiers échantillonnés a reçu deux sondes : <code>import { useId as tidyjsUnusedProbe } from 'react'</code> et un import de <code>./tidyjs-missing-probe</code>.</p>
@@ -694,16 +719,16 @@ missing modules: react, ./missing
     <div class="container-wide block stack-lg">
       <div class="cards three">
         <div class="card accent-border">
-          <div class="id">1 fichier Yeap, chemin rapide · 7 oct.</div>
-          <div class="value">0,31 à 0,34 s<span class="note">, ESLint non démarré</span></div>
+          <div class="id">1 fichier Yeap, chemin rapide · 7 oct., après intégration</div>
+          <div class="value">0,13 s<span class="note">, ESLint non démarré (0,31 à 0,34 s avant)</span></div>
         </div>
         <div class="card">
-          <div class="id">même fichier, --no-fast-analysis · 7 oct.</div>
-          <div class="value">2,68 s<span class="note">, TS 6.0.3 + ESLint</span></div>
+          <div class="id">1 fichier en analyse du fichier seul · 7 oct., après intégration</div>
+          <div class="value">0,73 s<span class="note">, contre 2,04 s en analyse complète</span></div>
         </div>
         <div class="card">
-          <div class="id">même fichier, --no-diagnostics · 7 oct.</div>
-          <div class="value">0,19 s<span class="note">, formatage seul</span></div>
+          <div class="id">1 fichier, --no-diagnostics · 7 oct., après intégration</div>
+          <div class="value">0,09 s<span class="note">, formatage seul (0,19 s avant)</span></div>
         </div>
       </div>
       <div class="frame">
@@ -711,33 +736,36 @@ missing modules: react, ./missing
         <table class="data-table">
           <thead><tr><th>banc</th><th>résultat</th><th>source</th></tr></thead>
           <tbody>
-            <tr><td>Yeap, 200 fichiers (100 avec sondes), chemin rapide</td><td class="accent">200/200 identiques, 0 avertissement</td><td class="muted">relancé le 7 oct.</td></tr>
-            <tr><td>Yeap, 200 fichiers, --no-fast-analysis</td><td class="accent">200/200 identiques</td><td class="muted">relancé le 7 oct.</td></tr>
-            <tr><td>Yeap, 40 fichiers (20 avec sondes), les deux modes</td><td class="accent">40/40 identiques</td><td class="muted">relancé le 7 oct.</td></tr>
+            <tr><td>Yeap, 200 fichiers (100 avec sondes), chemin rapide</td><td class="accent">200/200 identiques, 0 avertissement</td><td class="muted">relancé le 7 oct., après intégration</td></tr>
+            <tr><td>Yeap, 200 fichiers, --no-fast-analysis</td><td class="accent">200/200 identiques</td><td class="muted">relancé le 7 oct., après intégration</td></tr>
+            <tr><td>Yeap, 40 fichiers (20 avec sondes), les deux modes</td><td class="accent">40/40 identiques</td><td class="muted">relancé le 7 oct., après intégration</td></tr>
+            <tr><td>analyse du fichier seul contre analyse complète, 200 fichiers Yeap × 5 injections ({@link}, {@link} seul, 6192, @ts-nocheck, réassignation)</td><td class="accent">identiques pour chaque injection</td><td class="muted">7 oct., après intégration</td></tr>
             <tr><td>fichiers tranchés par l'oracle sur ces bancs</td><td>100/200 et 20/40 : les fichiers avec sonde ont un module introuvable, donc repli</td><td class="muted">relancé le 7 oct.</td></tr>
             <tr><td>fixtures test/compat (22 fichiers), 4 variantes : rapide, workers, complet, TS 7</td><td class="accent">identiques, sauf 1 écart voulu (config invalide)</td><td class="muted">Jest du 7 oct. ; TS 7 seulement si .vscode-test/ts7 existe</td></tr>
             <tr><td>Yeap, 20 et 200 fichiers, variantes TS 7 et 2 workers</td><td class="accent">20/20 et 200/200 identiques</td><td class="muted">session</td></tr>
-            <tr><td>chemin rapide contre analyse complète, 1 976 fichiers Yeap, réels et avec sondes</td><td class="accent">0 fichier différent ; 1 seul repli sur le code réel ({@link getDateFormat})</td><td class="muted">session</td></tr>
+            <tr><td>chemin rapide contre analyse complète, 1 976 fichiers Yeap, réels et avec sondes</td><td class="accent">0 fichier différent ; sur le code réel, 1 seul fichier en analyse du fichier seul ({@link getDateFormat}) et aucun en analyse complète</td><td class="muted">session, relancé le 7 oct. après intégration</td></tr>
             <tr><td>diagnostics utiles de apps/paye, TS 6 contre TS 7, hors VS Code</td><td>mêmes 11 diagnostics</td><td class="muted">session</td></tr>
           </tbody>
         </table>
       </div>
       <div class="frame">
-        <div class="frame-title">vitesse sur Yeap · mesures de la session, médiane de 3 passages</div>
+        <div class="frame-title">vitesse sur Yeap · session (médiane de 3 passages), chemin rapide mesuré le 7 oct. après intégration</div>
         <table class="data-table">
           <thead><tr><th>cas</th><th>1re version</th><th>TS 6 complet</th><th>--typescript 7</th><th>chemin rapide</th><th>VS Code</th></tr></thead>
           <tbody>
-            <tr><td>1 fichier</td><td>3,4 s</td><td>2,2 à 2,3 s</td><td>0,95 à 1,0 s</td><td class="accent">0,4 s</td><td>3 à 34 ms (médiane 14 ms)</td></tr>
-            <tr><td>20 fichiers</td><td>—</td><td>4,7 à 7,3 s</td><td>2,4 s</td><td class="accent">0,56 s</td><td>0,3 s au total</td></tr>
+            <tr><td>1 fichier</td><td>3,4 s</td><td>2,2 à 2,3 s</td><td>0,95 à 1,0 s</td><td class="accent">0,13 s</td><td>3 à 34 ms (médiane 14 ms)</td></tr>
+            <tr><td>1 fichier en analyse du fichier seul</td><td>—</td><td>2,0 s</td><td>—</td><td class="accent">0,73 s</td><td>—</td></tr>
+            <tr><td>1 fichier avec un module introuvable</td><td>—</td><td>2,2 s</td><td>—</td><td>2,2 s (analyse complète)</td><td>—</td></tr>
+            <tr><td>20 fichiers</td><td>—</td><td>4,7 à 7,3 s</td><td>2,4 s</td><td class="accent">0,30 s</td><td>0,3 s au total</td></tr>
             <tr><td>1 124 fichiers (apps/paye/src/@app/dossier)</td><td>23 s</td><td>14,8 s</td><td>6,7 s</td><td>—</td><td>—</td></tr>
-            <tr><td>1 976 fichiers (paye, pdf, ds)</td><td>—</td><td>24 s</td><td>—</td><td class="accent">9 s</td><td>—</td></tr>
+            <tr><td>1 976 fichiers (paye, pdf, ds)</td><td>—</td><td>24 s</td><td>—</td><td class="accent">3,3 à 4,1 s</td><td>—</td></tr>
             <tr><td>sans diagnostics, 1 124 fichiers</td><td>1,7 s</td><td>1,7 s</td><td>1,7 s</td><td>—</td><td>—</td></tr>
           </tbody>
         </table>
       </div>
       <div class="callout stack">
         <p>Pour 20 fichiers en TS 6 complet, la session donne 7,3 s dans une mesure et 4,7 s dans une autre : les deux chiffres sont repris tels quels. Le premier concernait deux projets TypeScript (<code>apps/paye</code> et <code>packages/ds</code>), donc deux programmes à construire. Le temps de VS Code mesure le formatage d'un fichier déjà ouvert : ses serveurs TypeScript et ESLint tournent déjà en mémoire.</p>
-        <p>D'après le profil de la session, le formatage seul prend environ 1,5 ms par fichier. Pour un fichier en chemin rapide, le temps se répartit ainsi : environ 40 ms de démarrage de Node, 85 ms pour charger TypeScript, puis l'oracle. Le cœur d'ESLint (350 ms) et la config ESLint de Yeap (environ 0,7 s par répertoire de travail) ne sont payés qu'en cas de repli.</p>
+        <p>Le formatage seul prend environ 1,5 ms par fichier. Le démarrage à froid a été réduit le 7 octobre, sans changer le résultat : <code>typescript-estree</code> et sa seconde copie de TypeScript ne sont plus chargés (environ 110 ms), le cache de compilation V8 du lanceur retire 70 à 100 ms par lancement, le cache disque des tsconfig fait passer leur lecture de 34,7 ms à 1,4 ms, le test d'appartenance d'un fichier à un tsconfig n'est plus quadratique, et le transfert brut d'oxc-parser fait passer le parse des 1 976 fichiers de 508 ms à 195 ms. Le cœur d'ESLint (350 ms) et la config ESLint de Yeap (environ 0,7 s par répertoire de travail) ne sont payés qu'en cas de repli.</p>
       </div>
     </div>
   </section>
@@ -769,13 +797,13 @@ missing modules: react, ./missing
           <li>
             <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-oracle"><span class="label">Oracle d'imports (scope-manager + résolution TS), repli exact</span><span class="verdict accent">retenu</span></button>
             <div class="row-detail" id="p-oracle" hidden>
-              <p>C'est le défaut actuel ; <code>--no-fast-analysis</code> le désactive. Il fait passer un fichier de 2,3 s à 0,4 s sur Yeap, sans écart observé. Ses limites, reconnues en fin de session : environ 300 lignes de règles maison qui doivent suivre TypeScript et typescript-eslint, une hypothèse (une référence pour ESLint en est une pour TypeScript) vérifiée sur Yeap mais pas démontrée, des modules ambiants recensés en partie seulement (dans ce cas, il se replie), et aucun effet pour les projets en TS 7.</p>
+              <p>C'est le défaut actuel ; <code>--no-fast-analysis</code> le désactive. Il fait passer un fichier de 2,3 s à 0,13 s sur Yeap, sans écart observé. Depuis le 7 octobre, il travaille sur l'AST d'oxc-parser : sur les 1 976 fichiers de Yeap, liaisons, références, écritures, positions, présence de JSX et mots JSDoc sont identiques à ceux de <code>typescript-estree</code>. Ses limites, reconnues en fin de session : environ 300 lignes de règles maison qui doivent suivre TypeScript et typescript-eslint, une hypothèse (une référence pour ESLint en est une pour TypeScript) vérifiée sur Yeap mais pas démontrée, des modules ambiants recensés en partie seulement (dans ce cas, il se replie), et aucun effet pour les projets en TS 7.</p>
             </div>
           </li>
           <li>
             <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-exact"><span class="label">Optimisations exactes : fichiers sans import, ESLint en processus séparé avec prélecture, saut d'ESLint si seul removeMissingModules et aucun module manquant</span><span class="verdict accent">retenu</span></button>
             <div class="row-detail" id="p-exact" hidden>
-              <p>Aucune ne change le résultat. ESLint tourne dans un processus, pas dans un thread, pour garder <code>process.chdir</code> possible. Son processus ne démarre qu'au premier fichier qui en a besoin.</p>
+              <p>Aucune ne change le résultat. ESLint tourne dans un processus, pas dans un thread, pour garder <code>process.chdir</code> possible. Son processus ne démarre qu'au premier fichier qui en a besoin, sauf avec <code>--no-fast-analysis</code>, où il est préchauffé dès le lancement.</p>
             </div>
           </li>
           <li>
@@ -839,9 +867,15 @@ missing modules: react, ./missing
             </div>
           </li>
           <li>
-            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-isolated"><span class="label">TypeScript sur le fichier seul (noResolve, noLib)</span><span class="verdict contested">mesuré, non implémenté</span></button>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-isolated"><span class="label">TypeScript sur le fichier seul (noResolve, noLib), premier étage du repli</span><span class="verdict accent">retenu</span></button>
             <div class="row-detail" id="p-isolated" hidden>
-              <p>L'idée vient de <code>prettier-plugin-organize-imports</code>, dont le service ne contient que le fichier traité (<code>getScriptFileNames: () =&gt; [path]</code>). Sur 1 963 fichiers Yeap, elle donne les mêmes diagnostics « inutilisé » que le programme complet, code et position compris, en 6,3 s (3,2 ms par fichier) contre 24,7 s. Elle remplacerait les règles maison de l'oracle côté TypeScript. Les modules manquants resteraient à la résolution : d'après <code>plans/cli-poc.md</code>, en <code>noResolve</code>, TypeScript émet un 2307 pour tous les imports. L'ancien POC perdu suivait déjà cette voie (1 fichier en 0,26 s sans ESLint).</p>
+              <p>L'idée vient de <code>prettier-plugin-organize-imports</code>, dont le service ne contient que le fichier traité (<code>getScriptFileNames: () =&gt; [path]</code>). Sur 1 963 fichiers Yeap, elle donne les mêmes diagnostics « inutilisé » que le programme complet, code et position compris, en 6,3 s (3,2 ms par fichier) contre 24,7 s. Elle est intégrée depuis le 7 octobre comme premier étage du repli, et non à la place de l'oracle : quand tous les modules se résolvent mais qu'un cas douteux empêche l'oracle de trancher, TypeScript vérifie le fichier seul et l'ESLint du projet le lint. Les modules manquants restent à la résolution, car en <code>noResolve</code> TypeScript émettrait un 2307 pour tous les imports. Un fichier passe ainsi de 2,04 s à 0,73 s.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-coldstart"><span class="label">Démarrage à froid : oracle sur l'AST oxc, cache de compilation V8, cache disque des tsconfig, test d'appartenance en Set, transfert brut d'oxc-parser</span><span class="verdict accent">retenu</span></button>
+            <div class="row-detail" id="p-coldstart" hidden>
+              <p>Cinq correctifs intégrés le 7 octobre, aucun ne change le résultat. Le cache des tsconfig repose sur <code>ts.matchFiles</code>, une fonction interne de TypeScript : s'il disparaît, le cache se désactive. Le transfert brut est limité à la CLI (<code>enableRawTransfer</code> dans <code>src/cli/main.ts</code>) ; l'extension garde le JSON, car le sandbox V8 d'Electron n'a pas été vérifié. Deux idées ont été écartées : remplacer aussi le parse TypeScript de l'oracle par l'AST oxc (coût égal, et les modes ESM/CJS sont internes à TypeScript), et décider qu'un module manque sans programme (2307 ou un autre code selon <code>module</code> et <code>moduleResolution</code>).</p>
             </div>
           </li>
           <li>
@@ -864,40 +898,42 @@ missing modules: react, ./missing
           </li>
         </ul>
       </div>
-      <p class="caption">Retenus : <span class="strong">5</span>. Écartés ou refusés : <span class="strong">7</span>, plus une recherche sans résultat. Mesurés sans intégration : <span class="strong">4</span>. TS 7 est intégré en option, mais reste litigieux.</p>
+      <p class="caption">Retenus : <span class="strong">7</span>. Écartés ou refusés : <span class="strong">7</span>, plus une recherche sans résultat. Mesurés sans intégration : <span class="strong">3</span>. TS 7 est intégré en option, mais reste litigieux.</p>
     </div>
   </section>
 
   <section id="section-6" class="section" data-rail-label="06 Suite">
     <header class="container-prose">
       <a class="section-number" href="#section-6">06</a>
-      <h2>Il reste des contournements utilisables tout de suite, et quatre décisions à prendre.</h2>
+      <h2>Il reste des contournements utilisables tout de suite, et trois décisions à prendre.</h2>
     </header>
     <div class="container-prose prose">
-      <p>La session s'est arrêtée sur une proposition non tranchée, avec deux points : remplacer les règles de l'oracle par TypeScript sur le fichier seul et ESLint réduit, et passer la copie TypeScript de la CLI en 6.x. Rien n'a été modifié dans TidyJS après les deux dernières questions (23 h 33 et 23 h 39). Les prototypes d'oxlint, de Bun, de l'oracle et des cœurs embarqués sont restés dans le scratchpad temporaire de la session, <code>/private/tmp/…/512aade5-…/scratchpad</code>, qui n'est pas pérenne.</p>
+      <p>La session du 6 octobre s'était arrêtée sur une proposition non tranchée, avec deux points : remplacer les règles de l'oracle par TypeScript sur le fichier seul et ESLint réduit, et passer la copie TypeScript de la CLI en 6.x. Le 7 octobre, la copie de TypeScript est passée en 6.0.3 avec l'alignement sur Yeap, et TypeScript sur le fichier seul est devenu le premier étage du repli, à côté de l'oracle et avec l'ESLint du projet plutôt qu'un ESLint réduit. Les prototypes d'oxlint, de Bun et de l'ESLint réduit sont restés dans le scratchpad temporaire de la session, <code>/private/tmp/…/512aade5-…/scratchpad</code>, qui n'est pas pérenne.</p>
     </div>
     <footer class="container-prose">
       <dl class="defs block">
-        <div><dt>À décider · branche et commit</dt><dd>Tout est non commité sur <code>main</code>. Il faut créer une branche, puis faire relire avant de commiter. Ni commit ni push n'ont été faits.</dd></div>
+        <div><dt>À décider · relecture et fusion</dt><dd>Le travail est commité (<code>d855937</code>) et poussé sur <code>poc/headless-tidy</code>. Aucune pull request n'est ouverte vers <code>main</code>.</dd></div>
         <div><dt>À décider · corrections du core qui changent l'extension</dt><dd>Quatre corrections touchent aussi VS Code. Un import n'est plus retiré à cause d'un homonyme : ce défaut a été prouvé dans VS Code sur <code>ReglementFormProvider.ts</code> (TS2552 après formatage). Le parser est recréé quand seule une regex change. Le tsconfig des alias est lu en JSONC avec <code>extends</code> : l'ancienne regex cassait le JSON avec <code>"@app/*"</code> puis <code>"src/**/*.ts"</code>. Enfin, l'éditeur utilise désormais le résolveur Node du mode dossier.</dd></div>
-        <div><dt>Fait le 7 octobre · alignement sur Yeap-UI-Apps</dt><dd>TidyJS utilise désormais les versions de Yeap : <code>typescript</code> 6.0.3 (copie de secours et parser de l'oracle), <code>typescript-eslint</code> et <code>@typescript-eslint/*</code> 8.60.0, <code>eslint</code> 9.39.4, <code>@types/node</code> 24.10.0. Le tsconfig de TidyJS perd <code>baseUrl</code>, que TypeScript 6 refuse (TS5101).</dd></div>
-        <div><dt>À décider · publication et CLAUDE.md</dt><dd>Le paquet npm est prêt mais pas publié. Un ajout à la section Architecture de <code>CLAUDE.md</code> a été proposé (core, adapters, <code>test:compat:record</code>), mais pas appliqué.</dd></div>
-        <div><dt>Contournement · ne rien supprimer</dt><dd><code>--no-diagnostics</code> (0,19 s par fichier mesuré le 7 octobre) ou <code>--profile folder</code> : tri et alignement seuls, sans TypeScript ni ESLint. Cela convient à un pre-commit rapide, mais les imports inutilisés ne sont pas retirés.</dd></div>
-        <div><dt>Contournement · limiter le lot</dt><dd><code>--staged</code> en pre-commit, <code>--changed</code> en local, <code>--check</code> en CI, après <code>npm ci</code> pour que les modules se résolvent.</dd></div>
+        <div><dt>Fait le 7 octobre · alignement sur Yeap-UI-Apps</dt><dd>TidyJS utilise désormais les versions de Yeap : <code>typescript</code> 6.0.3 (copie de secours), <code>typescript-eslint</code> et <code>@typescript-eslint/*</code> 8.60.0, <code>eslint</code> 9.39.4, <code>@types/node</code> 24.10.0. Le tsconfig de TidyJS perd <code>baseUrl</code>, que TypeScript 6 refuse (TS5101).</dd></div>
+        <div><dt>Décidé le 7 octobre · distribution et usage</dt><dd>Pas de publication npm et pas d'exécution en CI. La CLI est livrée dans le <code>.vsix</code>, et Yeap-UI-Apps l'appelle au <code>yarn commit</code> : les fichiers entièrement indexés sont formatés puis réindexés, les fichiers partiellement indexés seulement vérifiés ; <code>yarn tidy</code> formate les fichiers modifiés hors de l'index et les fichiers non suivis ; un fichier indexé, même en partie, n'est jamais écrit. Branche <code>feat/TICKET-25347-tidyjs-yarn-commit</code> du monorepo, non commitée.</dd></div>
+        <div><dt>Ajouté le 7 octobre · corrections ESLint à l'enregistrement</dt><dd>Dans Yeap, l'enregistrement lance <code>source.fixAll.eslint</code> avant TidyJS : <code>consistent-type-imports</code> passait <code>FC</code> en <code>import type</code> dans l'éditeur mais pas dans la CLI. La CLI applique maintenant les corrections de l'ESLint du projet quand <code>editor.codeActionsOnSave</code> les active, comme l'extension ESLint 3.0.34 (options, règles, blocs <code>[langage]</code>). Non reproduits : le mode <code>problems</code>, les corrections TypeScript de <code>source.fixAll</code> et <code>source.addMissingImports</code>.</dd></div>
+        <div><dt>À décider · CLAUDE.md</dt><dd>Un ajout à la section Architecture de <code>CLAUDE.md</code> a été proposé (core, adapters, <code>test:compat:record</code>), mais pas appliqué.</dd></div>
+        <div><dt>Contournement · ne rien supprimer</dt><dd><code>--no-diagnostics</code> (0,09 s par fichier, mesuré le 7 octobre après intégration) ou <code>--profile folder</code> : tri et alignement seuls, sans TypeScript ni ESLint. Cela convient à un pre-commit rapide, mais les imports inutilisés ne sont pas retirés.</dd></div>
+        <div><dt>Contournement · limiter le lot</dt><dd><code>--staged</code> au <code>yarn commit</code>, <code>--changed</code> en local, toujours après <code>yarn install</code> pour que les modules se résolvent.</dd></div>
         <div><dt>Contournement · ne toucher qu'aux imports</dt><dd>Mettre <code>sortEnumMembers</code>, <code>sortExports</code>, <code>sortClassProperties</code> et <code>sortTypeMembers</code> à <code>false</code> dans <code>tidyjs.json</code>. Cela change aussi le comportement de l'extension, et la parité reste la même.</dd></div>
         <div><dt>Contournement · aligner l'environnement</dt><dd>Dans VS Code, « Use Workspace Version » pour avoir le même TypeScript. Un <code>jsconfig.json</code>, ou des <code>@types</code> installés, suppriment l'écart dû à l'acquisition automatique de types pour les JS hors tsconfig. <code>--typescript</code> vers TS 7 accélère le repli, sans garantie de parité.</dd></div>
-        <div><dt>Piste à coder · cœurs embarqués exacts</dt><dd>TypeScript sur le fichier seul pour les inutilisés, résolution TS et <code>declare module</code> pour les modules, et ESLint du projet chargé seulement pour un import sans référence que TypeScript ne signale pas. D'après la session, cela fait moins de règles maison pour un temps comparable, autour de 0,35 à 0,4 s par fichier.</dd></div>
+        <div><dt>Fait le 7 octobre · repli à deux étages</dt><dd>TypeScript sur le fichier seul et l'ESLint du projet quand tous les modules se résolvent, le programme complet sinon. L'oracle garde ses règles maison pour décider sans rien lancer ; l'ESLint réduit à une règle n'a pas été intégré.</dd></div>
         <div><dt>Piste à coder · oxlint pour la part ESLint</dt><dd>Les options de <code>no-unused-vars</code> seraient lues une fois depuis ESLint, puis mises en cache. Gain estimé : environ 0,3 s par lancement. L'équivalence avec ESLint est observée sur Yeap, pas garantie ailleurs.</dd></div>
         <div><dt>Écarts connus avec VS Code</dt><dd>Plusieurs écarts sont connus : config invalide refusée par la CLI (exit 2) alors que le format à l'enregistrement formate quand même ; délai de publication des diagnostics dans l'éditeur ; acquisition automatique de types ; plugins tsserver ; messages TypeScript localisés (la regex est en anglais) ; réglages utilisateur non lus ; une racine par exécution.</dd></div>
         <div><dt>Comportements 1.9.2 conservés, non corrigés</dt><dd>Un import namespace inutilisé n'est jamais retiré, car l'analyse compare <code>ns</code> à <code>* as ns</code>. Seul <code>@typescript-eslint/no-unused-vars</code> est reconnu, pas <code>no-unused-vars</code>. Le 6192 ne nomme aucun import.</dd></div>
-        <div><dt>Incohérence de documentation</dt><dd>Au §1, <code>docs/cli-architecture.md</code> indique que <code>eslint.rules.customizations</code> n'est pas reproduit. Or <code>docs/cli.md</code> et le code (<code>customizedSeverity</code> dans <code>eslint-diagnostics.ts</code>) le prennent en charge.</dd></div>
+        <div><dt>Corrigé le 7 octobre · incohérences de documentation</dt><dd>Au §1, <code>docs/cli-architecture.md</code> disait que <code>eslint.rules.customizations</code> et <code>eslint.probe</code> n'étaient pas reproduits, alors que le code les applique (<code>customizedSeverity</code> et le test de <code>probe</code> dans <code>eslint-diagnostics.ts</code>). Le même fichier listait une partie seulement des modules de la CLI et disait l'hôte ESLint démarré au lancement. <code>docs/cli.md</code> oubliait <code>dist/cli-main.js</code> dans le paquet npm et proposait une commande <code>git diff</code> au lieu de <code>--staged</code>.</dd></div>
       </dl>
       <div class="page-footer">
         <p><a class="accent" href="cli.md">docs/cli.md</a><span class="muted"> : options, codes de sortie, configuration, diagnostics, vitesse.</span></p>
         <p><a class="accent" href="cli-architecture.md">docs/cli-architecture.md</a><span class="muted"> : couplage VS Code analysé, options A/B/C, écarts, oracle, modèle d'exécution.</span></p>
         <p><a class="accent" href="fonctionnement-tidyjs.html">docs/fonctionnement-tidyjs.html</a><span class="muted"> : fonctionnement du moteur de l'extension 1.9.2.</span></p>
       </div>
-      <p class="caption" style="margin-top:3rem">Sources : transcript de la session « CLI exploration » (6 oct. 2026), plans/cli.md, plans/cli-poc.md, code du dépôt, contrôles et bancs relancés le 7 oct. 2026.</p>
+      <p class="caption" style="margin-top:3rem">Sources : transcript de la session « CLI exploration » (6 oct. 2026), plans/cli.md, plans/cli-poc.md, code du commit d855937, contrôles et bancs relancés le 7 oct. 2026.</p>
     </footer>
   </section>
 </main>

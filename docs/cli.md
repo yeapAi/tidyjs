@@ -1,34 +1,27 @@
 # Command-Line Interface
 
-`tidyjs` runs the TidyJS engine from a terminal or a CI job. It uses the same parser, IR printer, configuration resolution and guards as the VS Code extension, and computes the TypeScript and ESLint diagnostics that the extension reads from the editor. For a given project, it produces the result of a save in VS Code once the TypeScript server and ESLint have finished their analysis.
+`tidyjs` runs the TidyJS engine from a terminal. This fork serves Yeap-UI-Apps, where it runs in the `yarn commit` step on the developer's machine, never in CI. It uses the same parser, IR printer, configuration resolution and guards as the VS Code extension, and computes the TypeScript and ESLint diagnostics that the extension reads from the editor. For a given project, it produces the result of a save in VS Code once the TypeScript server and ESLint have finished their analysis.
 
 How the two runtimes relate, and where they can differ, is described in [cli-architecture.md](cli-architecture.md).
 
 ## Requirements
 
 - Node.js 20 or later.
-- The `oxc-parser` native binding for the current platform. npm installs it automatically as an optional dependency of `oxc-parser`.
-- TypeScript, used only when `removeUnusedImports` or `removeMissingModules` is enabled. The project's own `typescript` package is used first, so the diagnostics come from the version the project builds with. The copy installed with TidyJS is the fallback.
+- The `oxc-parser` native binding for the current platform. The build copies the binding installed on the build machine into `dist/`, as for the extension, so a `.vsix` built on Apple Silicon only runs there.
+- TypeScript, used only when `removeUnusedImports` or `removeMissingModules` is enabled. The project's own `typescript` package is used, so the diagnostics come from the version the project builds with. Without it, a warning is printed and nothing is removed; in a checkout of this repository, its own `typescript` is the fallback.
 - ESLint, optional. It is always loaded from the project, never from TidyJS, because the project's configuration and plugins live there.
 
 ## Installation
 
-From this repository:
+TidyJS is not published on npm. The CLI ships inside the extension: `dist/cli.js` (a launcher that enables the V8 compile cache) and `dist/cli-main.js` (the bundle, with `oxc-parser` and its native binding) are packaged in the `.vsix` built by `npm run build`. Once the extension is installed, the CLI is at `~/.vscode/extensions/asmir.tidyjs-<version>/dist/cli.js`, with the same engine version as the editor.
+
+From a checkout of this repository:
 
 ```bash
 npm install
 node scripts/esbuild.mjs --production
 node dist/cli.js --help
 ```
-
-In a project, install the package as a development dependency, then call it with `npx`:
-
-```bash
-npm install --save-dev <path-or-git-url-of-tidyjs>
-npx tidyjs --write .
-```
-
-`npm pack` builds the CLI in production mode (`prepack`) and ships only `dist/cli.js`, the documentation and the schema.
 
 ## Usage
 
@@ -41,7 +34,7 @@ Without `--write` or `--check`, nothing is modified: the files that would change
 ```bash
 tidyjs src                      # list the files that would change
 tidyjs --diff src/app.tsx       # show the changes
-tidyjs --check .                # CI: exit 1 when a file would change
+tidyjs --check .                # exit 1 when a file would change
 tidyjs --write .                # apply the changes
 tidyjs --write "src/**/*.ts"    # quoted globs are expanded by tidyjs
 tidyjs --write --staged         # pre-commit: staged files only
@@ -105,6 +98,21 @@ When a source cannot run, removal falls back to the other source:
 - ESLint or TypeScript failing (broken configuration, crash): a warning, and only the other source is used.
 - No source at all: a warning, and nothing is removed. The imports are still sorted and aligned.
 
+## ESLint fixes on save
+
+With the `editor` profile, the CLI applies the fixes that the ESLint extension applies when a file is saved, before TidyJS formats it. They run when `editor.codeActionsOnSave` in `<root>/.vscode/settings.json` enables `source.fixAll.eslint`, or `source.fixAll` without disabling `source.fixAll.eslint`, with `true`, `"explicit"` or `"always"`. A `[language]` block, such as `[typescriptreact]`, overrides the general value. In Yeap-UI-Apps, this is how `@typescript-eslint/consistent-type-imports` moves a type-only name into `import type`.
+
+The fixes come from the project's ESLint, through its Node API, with the rules of the ESLint extension (verified in version 3.0.34):
+
+- ESLint is created with `eslint.options`, then `fix: true` and `eslint.codeActionsOnSave.options`, in the ESLint working directory, and lints the text of the file. Its `output` replaces the text.
+- `eslint.codeActionsOnSave.rules` turns off, for the fixes, every rule whose first matching pattern starts with `!` or that no pattern matches. An empty list turns off every rule.
+- Every fixable rule is applied, not only the rules about imports, as on save.
+- The fixes also apply to files that TidyJS skips (`excludedFolders`, `// tidyjs-ignore`), as on save.
+- `eslint.codeActionsOnSave.mode` set to `problems` applies the fixes the editor has already computed. That state only exists in the editor, so the CLI applies no fix and prints a warning.
+- `source.fixAll` also runs the TypeScript fixes, and `source.addMissingImports` adds imports. The CLI reproduces neither.
+
+`--no-eslint`, `--no-diagnostics` and `--profile folder` turn the fixes off. `--verbose` prints `eslint fixes: applied` or `none` for each file.
+
 ## Guards
 
 Every guard of the extension applies:
@@ -157,18 +165,16 @@ Measured on Yeap-UI-Apps (Apple Silicon laptop, 10 cores, real source code):
 
 VS Code is faster per file because its TypeScript server and ESLint are already running; the CLI starts from nothing on every run.
 
-## Continuous integration
+## Yeap-UI-Apps
 
-```yaml
-- run: npm ci
-- run: npx tidyjs --check .
-```
+The monorepo calls the CLI through `scripts/tidyjs.ts`, only on the developer's machine:
 
-To format staged files before a commit, pass them explicitly:
+- `yarn commit` runs `precommit` first (Yarn 1), which runs the script with `--commit`, then `yarn run check`. A file whose working-tree content equals the index is formatted with `--write` and staged again, which gives the same result as formatting before `git add`. A partially staged file is only checked with `--check`, so its unstaged changes never enter the commit: when it would change, the commit stops. A file that does not parse stops the commit too.
+- `yarn tidy` runs `tidyjs --write` on the files the script selects with its own `--unstaged` flag: files modified in the working tree and untracked files, minus any file present in the index, even partially. A staged file is never written, so the index never falls behind. The developer reviews the result with `git diff`, then stages it.
+- The script takes the CLI of the most recent `asmir.tidyjs-*` extension in the VS Code, VS Code Insiders or Cursor extension folders, or the file named by `TIDYJS_CLI`. Without one, the step is skipped with a warning.
+- Before running, the script compares the entries of `yarn.lock` with `node_modules/.yarn-integrity` and stops if they differ: `removeMissingModules` is enabled in Yeap's `tidyjs.json`, so a package added on another branch and not yet installed would be removed as missing.
 
-```bash
-npx tidyjs --write $(git diff --cached --name-only --diff-filter=ACM -- '*.ts' '*.tsx' '*.js' '*.jsx')
-```
+Git has no hook on `git add`, and VS Code stages with `git add` too, so `yarn commit` is the first point where the staged files are known.
 
 ## Compatibility tests
 
