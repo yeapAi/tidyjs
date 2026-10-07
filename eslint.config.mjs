@@ -31,6 +31,15 @@ export default tseslint.config(
       semi: "off",
     },
   },
+  {
+    files: ["src/**/*.ts"],
+    ignores: ["src/extension.ts", "src/vscode/**"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        paths: [{ name: "vscode", message: "Only src/extension.ts and src/vscode/ may depend on the VS Code API." }],
+      }],
+    },
+  },
   // Configuration pour les fichiers de test
   {
     files: ["test/**/*.ts", "test/**/*.js"],

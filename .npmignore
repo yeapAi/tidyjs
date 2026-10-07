@@ -1,0 +1,10 @@
+*
+!dist/
+dist/*
+!dist/cli.js
+!dist/cli-main.js
+!docs/
+docs/*
+!docs/cli.md
+!docs/cli-architecture.md
+!tidyjs.schema.json

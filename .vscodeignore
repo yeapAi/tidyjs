@@ -23,3 +23,6 @@ jest.config.js
 tsconfig.json
 tsconfig.test.json
 .vscode-test.mjs
+dist/cli.js*
+dist/cli-main.js*
+.npmignore

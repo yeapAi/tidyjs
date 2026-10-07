@@ -1,10 +1,26 @@
-import * as vscode from 'vscode';
+export interface LogSink {
+  isDebugEnabled(): boolean;
+  debug(message: string): void;
+  error(message: string): void;
+  notifyError?(message: string): void;
+  reveal?(): void;
+}
 
-const OUTPUT_CHANNEL = vscode.window.createOutputChannel('TidyJS');
-const DEBUG_MODE = () => {
-  const config = vscode.workspace.getConfiguration('tidyjs');
-  return config.get('debug', false);
+const silentSink: LogSink = {
+  isDebugEnabled: () => false,
+  debug: () => undefined,
+  error: () => undefined,
 };
+
+let activeSink: LogSink = silentSink;
+
+export function setLogSink(sink: LogSink | null): void {
+  activeSink = sink ?? silentSink;
+}
+
+export function isDebugLoggingEnabled(): boolean {
+  return activeSink.isDebugEnabled();
+}
 
 function formatDebugArgs(args: unknown[]): string {
   return args
@@ -95,7 +111,7 @@ function formatArray(arr: unknown[]): string {
 }
 
 export function logDebug(message: string, ...args: unknown[]): void {
-  if (!DEBUG_MODE()) {
+  if (!activeSink.isDebugEnabled()) {
     return;
   }
 
@@ -104,7 +120,7 @@ export function logDebug(message: string, ...args: unknown[]): void {
     formattedMessage += '\n' + formatDebugArgs(args);
   }
 
-  OUTPUT_CHANNEL.appendLine(formattedMessage);
+  activeSink.debug(formattedMessage);
 }
 
 export function logError(message: string, ...args: unknown[]): void {
@@ -125,9 +141,11 @@ export function logError(message: string, ...args: unknown[]): void {
         .join(' ');
   }
 
-  OUTPUT_CHANNEL.appendLine(formattedMessage);
-  // Show errors but don't steal focus from the user's current work
-  OUTPUT_CHANNEL.show(true);
+  activeSink.error(formattedMessage);
+}
+
+export function notifyError(message: string): void {
+  activeSink.notifyError?.(message);
 }
 
 /**
@@ -135,7 +153,7 @@ export function logError(message: string, ...args: unknown[]): void {
  * This can be called manually when user wants to see logs
  */
 export function showOutputChannel(): void {
-  OUTPUT_CHANNEL.show();
+  activeSink.reveal?.();
 }
 
 

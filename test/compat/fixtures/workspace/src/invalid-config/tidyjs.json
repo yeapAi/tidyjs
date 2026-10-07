@@ -1,0 +1,6 @@
+{
+    "groups": [
+        { "name": "First", "default": true },
+        { "name": "Second", "default": true }
+    ]
+}

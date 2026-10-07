@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 const production = process.argv.includes('--production');
+const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const watch = process.argv.includes('--watch');
 
 /**
@@ -106,6 +107,43 @@ const config = {
     ],
 };
 
+/**
+ * CLI configuration — ESM for Node.
+ * oxc-parser stays external so npm installs the binding of the running platform.
+ * typescript and eslint are resolved from the formatted project at runtime.
+ * @type {import('esbuild').BuildOptions}
+ */
+const cliConfig = {
+    entryPoints: ['src/cli/main.ts'],
+    bundle: true,
+    format: 'esm',
+    minify: production,
+    sourcemap: !production,
+    sourcesContent: false,
+    platform: 'node',
+    target: ['node20'],
+    outfile: 'dist/cli-main.js',
+    mainFields: ['module', 'main'],
+    external: ['oxc-parser', 'typescript', 'eslint'],
+    banner: { js: "#!/usr/bin/env node\nimport { createRequire as __tidyjsCreateRequire } from 'module';\nconst require = __tidyjsCreateRequire(import.meta.url);" },
+    define: {
+        TIDYJS_PACKAGE: JSON.stringify({
+            name: packageJson.name,
+            version: packageJson.version,
+            contributes: { configuration: packageJson.contributes.configuration },
+        }),
+    },
+    logLevel: 'silent',
+    legalComments: 'none',
+    plugins: [esbuildProblemMatcherPlugin],
+};
+
+function writeCliLauncher() {
+    fs.mkdirSync('dist', { recursive: true });
+    fs.writeFileSync('dist/cli.js', "#!/usr/bin/env node\nimport module from 'node:module';\n\nmodule.enableCompileCache?.();\nawait import('./cli-main.js');\n");
+    fs.chmodSync('dist/cli.js', 0o755);
+}
+
 async function main() {
     // Clean dist/ before production builds to remove stale artifacts
     if (production) {
@@ -113,12 +151,18 @@ async function main() {
     }
 
     const ctx = await esbuild.context(config);
+    const cliCtx = await esbuild.context(cliConfig);
 
     if (watch) {
         copyNativeBindings();
+        writeCliLauncher();
         await ctx.watch();
+        await cliCtx.watch();
     } else {
         const result = await ctx.rebuild();
+        await cliCtx.rebuild();
+        writeCliLauncher();
+        await cliCtx.dispose();
         copyNativeBindings();
         if (result.metafile) {
             fs.writeFileSync('dist/meta.json', JSON.stringify(result.metafile, null, 2));

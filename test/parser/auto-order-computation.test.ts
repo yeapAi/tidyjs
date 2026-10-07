@@ -1,4 +1,4 @@
-import { configManager } from '../../src/utils/config';
+import { configManager } from '../../src/vscode/config-manager';
 import * as logUtils from '../../src/utils/log';
 
 // Mock the log utils

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { ConfigLoader } from '../../src/utils/configLoader';
+import { ConfigLoader } from '../../src/vscode/config-loader';
 import { TidyJSConfigFile } from '../../src/types';
 
 // Mock vscode

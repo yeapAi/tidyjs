@@ -1,0 +1,7 @@
+{
+    // Read by VS Code during recording, and by the CLI for tidyjs.* and eslint.*
+    "editor.defaultFormatter": "Asmir.tidyjs",
+    "editor.formatOnSave": false,
+    "tidyjs.format.bracketSpacing": false,
+    "tidyjs.format.blankLinesBetweenGroups": 1,
+}

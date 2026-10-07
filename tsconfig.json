@@ -13,10 +13,9 @@
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
     "noEmit": true,
-    "baseUrl": ".",
     "paths": {
-      "@app/*": ["src/@app/*"],
-      "@core/*": ["src/@core/*"]
+      "@app/*": ["./src/@app/*"],
+      "@core/*": ["./src/@core/*"]
     }
   },
   "include": ["src/**/*.ts"]

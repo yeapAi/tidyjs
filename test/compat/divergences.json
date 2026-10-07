@@ -1,0 +1,10 @@
+[
+    {
+        "path": "src/invalid-config/file.ts",
+        "cause": "intentional",
+        "avoidable": true,
+        "acceptable": true,
+        "cli": "untouched",
+        "explanation": "The format-on-save provider never validates the configuration, so VS Code formats with two default groups. The CLI validates like the Format Imports command, reports the error with exit code 2 and leaves the file untouched."
+    }
+]

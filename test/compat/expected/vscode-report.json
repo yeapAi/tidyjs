@@ -1,0 +1,439 @@
+{
+  "vscodeVersion": "1.140.0",
+  "files": [
+    {
+      "path": "src/app/feature/local.ts",
+      "changed": false,
+      "formatMs": 8.741084,
+      "diagnostics": []
+    },
+    {
+      "path": "src/app/feature/view.ts",
+      "changed": true,
+      "formatMs": 25.529,
+      "diagnostics": []
+    },
+    {
+      "path": "src/basic/empty.ts",
+      "changed": false,
+      "formatMs": 2.932833,
+      "diagnostics": []
+    },
+    {
+      "path": "src/basic/import-kinds.ts",
+      "changed": true,
+      "formatMs": 15.467584,
+      "diagnostics": []
+    },
+    {
+      "path": "src/basic/polyfill.ts",
+      "changed": false,
+      "formatMs": 3.984083,
+      "diagnostics": []
+    },
+    {
+      "path": "src/comments/comments.ts",
+      "changed": true,
+      "formatMs": 17.696417,
+      "diagnostics": []
+    },
+    {
+      "path": "src/excluded/file.ts",
+      "changed": false,
+      "formatMs": 3.028834,
+      "diagnostics": [
+        {
+          "source": "ts",
+          "code": 6192,
+          "severity": "hint",
+          "message": "All imports in import declaration are unused.",
+          "line": 1
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'createPatch' is defined but never used.",
+          "line": 1
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'applyPatch' is defined but never used.",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "path": "src/ignored/pragma.ts",
+      "changed": false,
+      "formatMs": 3.05975,
+      "diagnostics": [
+        {
+          "source": "ts",
+          "code": 6192,
+          "severity": "hint",
+          "message": "All imports in import declaration are unused.",
+          "line": 2
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'createPatch' is defined but never used.",
+          "line": 2
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'applyPatch' is defined but never used.",
+          "line": 2
+        }
+      ]
+    },
+    {
+      "path": "src/invalid-config/file.ts",
+      "changed": true,
+      "formatMs": 7.520042,
+      "diagnostics": []
+    },
+    {
+      "path": "src/invalid/syntax-error.ts",
+      "changed": false,
+      "formatMs": 4.567,
+      "diagnostics": [
+        {
+          "source": "ts",
+          "code": 1109,
+          "severity": "error",
+          "message": "Expression expected.",
+          "line": 3
+        },
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'readFileSync' is declared but its value is never read.",
+          "line": 0
+        },
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'createPatch' is declared but its value is never read.",
+          "line": 1
+        },
+        {
+          "source": "eslint",
+          "severity": "error",
+          "message": "Parsing error: Expression expected.",
+          "line": 3
+        }
+      ]
+    },
+    {
+      "path": "src/js/component.jsx",
+      "changed": true,
+      "formatMs": 10.042792,
+      "diagnostics": [
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'applyPatch' is declared but its value is never read.",
+          "line": 2
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'applyPatch' is defined but never used.",
+          "line": 2
+        }
+      ]
+    },
+    {
+      "path": "src/js/plain.js",
+      "changed": true,
+      "formatMs": 12.8295,
+      "diagnostics": [
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'dirname' is declared but its value is never read.",
+          "line": 1
+        },
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'helper' is declared but its value is never read.",
+          "line": 2
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'dirname' is defined but never used.",
+          "line": 1
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'helper' is defined but never used.",
+          "line": 2
+        }
+      ]
+    },
+    {
+      "path": "src/local/local-config.ts",
+      "changed": true,
+      "formatMs": 13.608125,
+      "diagnostics": []
+    },
+    {
+      "path": "src/missing/missing-modules.ts",
+      "changed": true,
+      "formatMs": 11.397375,
+      "diagnostics": [
+        {
+          "source": "ts",
+          "code": 2307,
+          "severity": "error",
+          "message": "Cannot find module 'not-installed-package' or its corresponding type declarations.",
+          "line": 0
+        },
+        {
+          "source": "ts",
+          "code": 2307,
+          "severity": "error",
+          "message": "Cannot find module './does-not-exist' or its corresponding type declarations.",
+          "line": 1
+        },
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'fallback' is declared but its value is never read.",
+          "line": 1
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'fallback' is defined but never used.",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "path": "src/placement/import-after-code.ts",
+      "changed": true,
+      "formatMs": 13.035125,
+      "diagnostics": []
+    },
+    {
+      "path": "src/post/with-imports.ts",
+      "changed": true,
+      "formatMs": 13.533666,
+      "diagnostics": []
+    },
+    {
+      "path": "src/post/without-imports.ts",
+      "changed": true,
+      "formatMs": 8.79875,
+      "diagnostics": []
+    },
+    {
+      "path": "src/shared/helper.ts",
+      "changed": false,
+      "formatMs": 5.416667,
+      "diagnostics": []
+    },
+    {
+      "path": "src/tsx/component.tsx",
+      "changed": true,
+      "formatMs": 19.493084,
+      "diagnostics": [
+        {
+          "source": "ts",
+          "code": 7026,
+          "severity": "error",
+          "message": "JSX element implicitly has type 'any' because no interface 'JSX.IntrinsicElements' exists.",
+          "line": 6
+        },
+        {
+          "source": "ts",
+          "code": 7026,
+          "severity": "error",
+          "message": "JSX element implicitly has type 'any' because no interface 'JSX.IntrinsicElements' exists.",
+          "line": 6
+        },
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'useMemo' is declared but its value is never read.",
+          "line": 1
+        },
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'view' is declared but its value is never read.",
+          "line": 2
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'useMemo' is defined but never used.",
+          "line": 1
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'view' is defined but never used.",
+          "line": 2
+        }
+      ]
+    },
+    {
+      "path": "src/types/react.d.ts",
+      "changed": false,
+      "formatMs": 3.88525,
+      "diagnostics": []
+    },
+    {
+      "path": "src/unused/all-specifiers-unused.ts",
+      "changed": true,
+      "formatMs": 13.747791,
+      "diagnostics": [
+        {
+          "source": "ts",
+          "code": 6192,
+          "severity": "hint",
+          "message": "All imports in import declaration are unused.",
+          "line": 0
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'join' is defined but never used.",
+          "line": 0
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'resolve' is defined but never used.",
+          "line": 0
+        }
+      ]
+    },
+    {
+      "path": "src/unused/same-name-parameter.ts",
+      "changed": true,
+      "formatMs": 12.614708,
+      "diagnostics": [
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'readFileSync' is declared but its value is never read.",
+          "line": 1
+        },
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'createPatch' is declared but its value is never read.",
+          "line": 4
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'readFileSync' is defined but never used.",
+          "line": 1
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'createPatch' is defined but never used.",
+          "line": 4
+        }
+      ]
+    },
+    {
+      "path": "src/unused/single-specifiers.ts",
+      "changed": true,
+      "formatMs": 14.21575,
+      "diagnostics": [
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'writeFileSync' is declared but its value is never read.",
+          "line": 0
+        },
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'path' is declared but its value is never read.",
+          "line": 1
+        },
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'Stats' is declared but its value is never read.",
+          "line": 2
+        },
+        {
+          "source": "ts",
+          "code": 6133,
+          "severity": "hint",
+          "message": "'os' is declared but its value is never read.",
+          "line": 3
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'writeFileSync' is defined but never used.",
+          "line": 0
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'path' is defined but never used.",
+          "line": 1
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'Stats' is defined but never used.",
+          "line": 2
+        },
+        {
+          "source": "eslint",
+          "code": "@typescript-eslint/no-unused-vars",
+          "severity": "warning",
+          "message": "'os' is defined but never used.",
+          "line": 3
+        }
+      ]
+    }
+  ]
+}

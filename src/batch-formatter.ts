@@ -1,20 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as vscode from 'vscode';
 
-import { formatImports } from './formatter';
-import { sortCodePatterns } from './destructuring-sorter';
-import { organizeReExports } from './reexport-organizer';
-import { ImportParser } from './parser';
-import { PathResolver } from './utils/path-resolver';
-import { configManager } from './utils/config';
-import { ConfigLoader } from './utils/configLoader';
-import { validateFormattedOutput } from './utils/format-validation';
-import { hasIgnorePragma } from './utils/ignore-pragma';
+import { formatSource, isFileInExcludedFolder, ParserCache } from './core/pipeline';
 import { logDebug, logError } from './utils/log';
 
+import type { FailureStage, UnchangedReason } from './core/pipeline';
+import type { ImportParser } from './parser';
 import type { Config } from './types';
-import type { ParserResult, ParsedImport, ImportSource } from './parser';
+
+export { isFileInExcludedFolder };
 
 // --- Types ---
 
@@ -28,14 +22,15 @@ interface BatchFormatResult {
 interface BatchFormatCallbacks {
     onProgress: (current: number, total: number, filePath: string) => void;
     isCancelled: () => boolean;
-    createUri: (filePath: string) => vscode.Uri;
+    resolveConfig: (filePath: string) => Promise<Config>;
+    fallbackConfig: () => Config;
 }
 
 // --- Constants ---
 
-const SUPPORTED_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
+export const SUPPORTED_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
 
-const ALWAYS_SKIP_DIRS = new Set([
+export const ALWAYS_SKIP_DIRS = new Set([
     'node_modules', '.git', 'dist', 'build', 'out',
     '.next', 'coverage', '.cache', '.turbo',
 ]);
@@ -86,30 +81,10 @@ export async function discoverFiles(folderPath: string): Promise<string[]> {
     return files;
 }
 
-export function isFileInExcludedFolder(
-    filePath: string,
-    config: Config,
-    workspaceRoot: string | undefined
-): boolean {
-    const excludedFolders = config.excludedFolders;
-    if (!excludedFolders || excludedFolders.length === 0 || !workspaceRoot) {
-        return false;
-    }
-
-    const relativePath = path.relative(workspaceRoot, filePath).replace(/\\/g, '/');
-
-    return excludedFolders.some((excluded) => {
-        const normalizedExcluded = excluded.replace(/\\/g, '/');
-        return relativePath.startsWith(normalizedExcluded + '/') || relativePath === normalizedExcluded;
-    });
-}
-
-type SkipReason = 'empty' | 'ignored' | 'no-imports' | 'unchanged';
-
 interface SingleFileResult {
     changed: boolean;
     error?: string;
-    skipReason?: SkipReason;
+    skipReason?: UnchangedReason;
 }
 
 export async function formatSingleFile(
@@ -125,94 +100,25 @@ export async function formatSingleFile(
         return { changed: false, error: `Failed to read file: ${error}` };
     }
 
-    // Skip empty files
-    if (!sourceText.trim()) {
-        return { changed: false, skipReason: 'empty' };
+    const outcome = await formatSource({
+        text: sourceText,
+        filePath,
+        config,
+        workspaceRoot,
+        parsers: new ParserCache(parserCache),
+        profile: 'folder',
+    });
+
+    if (outcome.status === 'unchanged') {
+        return { changed: false, skipReason: outcome.reason };
     }
 
-    // Skip files with tidyjs-ignore pragma
-    if (hasIgnorePragma(sourceText)) {
-        return { changed: false, skipReason: 'ignored' };
+    if (outcome.status === 'failed') {
+        return { changed: false, error: describeFailure(outcome.stage, outcome.message) };
     }
 
-    // Get or create parser for this config
-    const configKey = JSON.stringify(config);
-    let parser = parserCache.get(configKey);
-    if (!parser) {
-        parser = new ImportParser(config);
-        parserCache.set(configKey, parser);
-    }
-
-    // Parse the source
-    let parserResult: ParserResult;
     try {
-        parserResult = parser.parse(sourceText, undefined, undefined, filePath);
-    } catch (error) {
-        return { changed: false, error: `Parse error: ${error}` };
-    }
-
-    // Apply path resolution if enabled
-    if (config.pathResolution?.mode && workspaceRoot) {
-        try {
-            const pathResolver = new PathResolver({
-                mode: config.pathResolution.mode,
-                preferredAliases: config.pathResolution.preferredAliases || [],
-                aliases: config.pathResolution.aliases,
-            });
-            const enhanced = applyPathResolutionBatch(
-                parserResult, pathResolver, filePath, parser,
-                config.pathResolution.mode, workspaceRoot
-            );
-            if (enhanced) { parserResult = enhanced; }
-        } catch (error) {
-            logError('Error during batch path resolution:', error);
-        }
-    }
-
-    // Skip files with invalid imports
-    if (parserResult.invalidImports && parserResult.invalidImports.length > 0) {
-        return { changed: false, error: `Invalid imports: ${parserResult.invalidImports[0].error}` };
-    }
-
-    let finalText = sourceText;
-    const hasImports = parserResult.importRange && parserResult.groups.length > 0;
-
-    // Format imports if there are any
-    if (hasImports) {
-        const formattedDocument = await formatImports(sourceText, config, parserResult);
-        if (formattedDocument.error) {
-            return { changed: false, error: `Format error: ${formattedDocument.error}` };
-        }
-        finalText = formattedDocument.text;
-    }
-
-    // Post-processing: sort enums/exports/class properties
-    if (config.format?.sortEnumMembers ||
-        config.format?.sortExports ||
-        config.format?.sortClassProperties ||
-        config.format?.sortTypeMembers) {
-        finalText = sortCodePatterns(finalText, config);
-    }
-
-    // Post-processing: organize re-exports
-    if (config.format?.organizeReExports) {
-        finalText = organizeReExports(finalText, config);
-    }
-
-    // No changes needed
-    if (finalText === sourceText) {
-        return { changed: false, skipReason: hasImports ? 'unchanged' : 'no-imports' };
-    }
-
-    // Validation: re-parse the formatted output to ensure it's valid
-    const validationError = validateFormattedOutput(parser, finalText, filePath);
-    if (validationError) {
-        return { changed: false, error: `Post-format validation failed: ${validationError}` };
-    }
-
-    // Write the formatted file
-    try {
-        await fs.promises.writeFile(filePath, finalText, 'utf8');
+        await fs.promises.writeFile(filePath, outcome.text, 'utf8');
     } catch (error) {
         return { changed: false, error: `Failed to write file: ${error}` };
     }
@@ -220,74 +126,16 @@ export async function formatSingleFile(
     return { changed: true };
 }
 
-// --- Path resolution for batch mode ---
-
-function applyPathResolutionBatch(
-    originalResult: ParserResult,
-    pathResolver: PathResolver,
-    filePath: string,
-    parserInstance: ImportParser,
-    mode: 'absolute' | 'relative',
-    workspaceRoot: string
-): ParserResult | null {
-    try {
-        const allImports: ParsedImport[] = [];
-        for (const group of originalResult.groups) {
-            allImports.push(...group.imports);
-        }
-
-        const convertedImports: ParsedImport[] = [];
-        let hasChanges = false;
-        let convertedCount = 0;
-
-        for (const importInfo of allImports) {
-            const resolvedPath = pathResolver.convertImportPathBatch(
-                importInfo.source,
-                filePath,
-                workspaceRoot
-            );
-
-            if (resolvedPath && resolvedPath !== importInfo.source) {
-                let groupName = importInfo.groupName;
-                let isPriority = importInfo.isPriority;
-
-                // Only re-group in absolute mode — the new alias path may match a different group.
-                if (mode === 'absolute') {
-                    const result = parserInstance.determineGroup(resolvedPath);
-                    groupName = result.groupName;
-                    isPriority = result.isPriority;
-                }
-
-                convertedImports.push({
-                    ...importInfo,
-                    source: resolvedPath as ImportSource,
-                    groupName,
-                    isPriority
-                });
-                hasChanges = true;
-                convertedCount++;
-                logDebug(`Path resolved (batch): ${importInfo.source} -> ${resolvedPath} (group: ${groupName})`);
-            } else {
-                convertedImports.push(importInfo);
-            }
-        }
-
-        if (!hasChanges) {
-            logDebug('Path resolution (batch): no changes needed');
-            return null;
-        }
-
-        logDebug(`Path resolution (batch): ${convertedCount}/${allImports.length} imports converted`);
-
-        const regroupedGroups = parserInstance.organizeImportsIntoGroups(convertedImports);
-
-        return {
-            ...originalResult,
-            groups: regroupedGroups
-        };
-    } catch (error) {
-        logError('Error applying path resolution with regrouping (batch):', error);
-        return null;
+function describeFailure(stage: FailureStage, message: string): string {
+    switch (stage) {
+        case 'invalid-imports':
+            return `Invalid imports: ${message}`;
+        case 'format':
+            return `Format error: ${message}`;
+        case 'validation':
+            return `Post-format validation failed: ${message}`;
+        default:
+            return `Parse error: ${message}`;
     }
 }
 
@@ -315,10 +163,6 @@ export async function formatFolder(
     }
 
     try {
-        // Clear ConfigLoader cache for fresh config resolution
-        ConfigLoader.clearCache();
-        configManager.clearDocumentCache();
-
         logDebug(`Batch format: discovering files in ${folderPath}`);
         const files = await discoverFiles(folderPath);
         result.totalFiles = files.length;
@@ -339,11 +183,10 @@ export async function formatFolder(
             // Load config for this specific file
             let config: Config;
             try {
-                const uri = callbacks.createUri(filePath);
-                config = await configManager.getConfigForUri(uri);
+                config = await callbacks.resolveConfig(filePath);
             } catch (error) {
                 logError(`Batch format: failed to load config for ${filePath}:`, error);
-                config = configManager.getConfig();
+                config = callbacks.fallbackConfig();
             }
 
             // Check excluded folders

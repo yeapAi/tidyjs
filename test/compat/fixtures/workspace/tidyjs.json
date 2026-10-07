@@ -1,0 +1,18 @@
+{
+    "groups": [
+        { "name": "React", "match": "^react", "order": 0 },
+        { "name": "Node", "match": "^(node:|fs$|path$|os$)", "order": 1 },
+        { "name": "External", "match": "^[^@.]", "order": 2 },
+        { "name": "App", "match": "^@app/", "order": 3 },
+        { "name": "Shared", "match": "^@shared/", "order": 4 },
+        { "name": "Misc", "default": true, "order": 5 }
+    ],
+    "format": {
+        "removeUnusedImports": true,
+        "removeMissingModules": true
+    },
+    "pathResolution": {
+        "mode": "absolute"
+    },
+    "excludedFolders": ["src/excluded"]
+}

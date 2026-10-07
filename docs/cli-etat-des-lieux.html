@@ -1,0 +1,999 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>État de la CLI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Mono:wght@400;500&family=Poppins:wght@300;400;500;600&display=swap">
+<style>
+:root {
+  --background: #ffffff;
+  --foreground: #050a18;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --ring: #80bfff;
+  --accent: #0066cc;
+  --accent-wash: #e6f2fe;
+  --denied: #dc2626;
+  --denied-wash: #fef2f2;
+  --radius: 0.5rem;
+  --radius-sm: 0.25rem;
+  --font-sans: "Poppins", system-ui, sans-serif;
+  --font-mono: "Noto Sans Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #050a18;
+    --foreground: #f8fafc;
+    --muted: #1e293b;
+    --muted-foreground: #94a3b8;
+    --border: #ffffff1a;
+    --ring: #004d99;
+    --accent: #6db2f8;
+    --accent-wash: #062647;
+    --denied: #f87171;
+    --denied-wash: #450a0a;
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: #050a18;
+  --foreground: #f8fafc;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --border: #ffffff1a;
+  --ring: #004d99;
+  --accent: #6db2f8;
+  --accent-wash: #062647;
+  --denied: #f87171;
+  --denied-wash: #450a0a;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  border-color: var(--border);
+  outline-color: color-mix(in oklab, var(--ring) 50%, transparent);
+}
+
+html {
+  font-family: var(--font-sans);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent-wash);
+  color: var(--foreground);
+}
+
+main { padding-bottom: 6rem; }
+h1, h2, h3, p, dl, dd, ul, ol, pre, table { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+a { color: inherit; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: default; }
+
+.mono { font-family: var(--font-mono); }
+.tabular { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted-foreground); }
+.accent { color: var(--accent); }
+.denied { color: var(--denied); }
+
+.container-prose { max-width: 42rem; margin-inline: auto; padding-inline: 1.5rem; }
+.container-wide { max-width: 64rem; margin-inline: auto; padding-inline: 1.5rem; }
+
+.page-header { padding-block: 5rem 4rem; }
+.page-header h1 {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: -0.032rem;
+  text-wrap: balance;
+}
+.page-header .lead {
+  margin-top: 2rem;
+  display: grid;
+  gap: 1rem;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--muted-foreground);
+}
+
+.section {
+  border-top: 1px solid var(--border);
+  padding-block: 4rem;
+  scroll-margin-top: 2rem;
+}
+.section-number {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: var(--muted-foreground);
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.15s;
+}
+.section-number:hover { color: var(--accent); }
+.section h2 {
+  font-size: 1.375rem;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: -0.012rem;
+  text-wrap: balance;
+}
+
+.prose {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 1rem;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--muted-foreground);
+}
+.prose strong { font-weight: 500; color: var(--foreground); }
+.prose code, .inline-code {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--foreground);
+}
+
+.block { margin-top: 2.5rem; }
+.stack { display: grid; gap: 1rem; }
+.stack-lg { display: grid; gap: 3rem; }
+
+.callout {
+  border-left: 2px solid var(--accent);
+  padding-left: 1rem;
+  font-size: 0.825rem;
+  line-height: 1.7;
+  color: var(--muted-foreground);
+}
+.callout.neutral { border-left-color: var(--border); }
+.callout.denied { border-left-color: var(--denied); }
+.callout > * + * { margin-top: 1rem; }
+
+.caption {
+  margin-top: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.625;
+  color: var(--muted-foreground);
+}
+.caption .strong { color: var(--foreground); }
+
+.frame { border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
+.frame-title {
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+}
+
+pre.code {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.9;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.frame pre.code { border: 0; border-radius: 0; line-height: 1.625; font-size: 0.72rem; }
+pre.code .key {
+  border-radius: var(--radius-sm);
+  color: var(--foreground);
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in oklab, var(--accent) 40%, transparent);
+  text-underline-offset: 4px;
+  transition: color 0.15s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), text-decoration-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+pre.code .key.active { background: var(--accent-wash); color: var(--accent); }
+pre.code .key:hover { text-decoration-color: var(--accent); }
+
+.split { display: grid; gap: 1.5rem; }
+.aside {
+  border: 1px solid color-mix(in oklab, var(--accent) 30%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--accent-wash) 40%, transparent);
+}
+.aside-head {
+  border-bottom: 1px solid color-mix(in oklab, var(--accent) 20%, transparent);
+  padding: 0.75rem 1rem;
+}
+.aside-head .label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent); }
+.aside-head .label .type { margin-left: 0.5rem; opacity: 0.7; }
+.aside-head h3 { margin-top: 0.375rem; font-size: 0.875rem; font-weight: 500; }
+.aside-body { padding: 0.75rem 1rem; display: grid; gap: 0.75rem; font-size: 0.8rem; line-height: 1.625; }
+.aside-body .instead { color: var(--muted-foreground); }
+.aside-body .instead .tag {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.chip {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-align: left;
+  color: var(--muted-foreground);
+  transition: color 0.15s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.chip:hover { color: var(--foreground); }
+.chip[aria-pressed="true"] {
+  border-color: color-mix(in oklab, var(--accent) 40%, transparent);
+  background: color-mix(in oklab, var(--accent-wash) 60%, transparent);
+  color: var(--foreground);
+}
+.chip.sans { font-family: var(--font-sans); font-size: 0.75rem; line-height: 1.375; }
+
+[hidden] { display: none !important; }
+
+.table-head, .table-row-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6.5rem;
+  gap: 0.75rem;
+}
+.table-head {
+  border-bottom: 1px solid var(--border);
+  padding: 0.5rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted-foreground);
+}
+.verdict-list li { border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent); }
+.verdict-list li:last-child { border-bottom: 0; }
+.table-row-button {
+  width: 100%;
+  align-items: baseline;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  transition: background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.table-row-button:hover, .table-row-button[aria-expanded="true"] { background: color-mix(in oklab, var(--muted) 60%, transparent); }
+.table-row-button .label { font-size: 0.875rem; line-height: 1.375; }
+.table-row-button .verdict { font-family: var(--font-mono); font-size: 0.7rem; color: var(--muted-foreground); }
+.table-row-button .verdict.accent { color: var(--accent); }
+.table-row-button .verdict.contested {
+  color: var(--foreground);
+  text-decoration: underline dotted;
+  text-decoration-color: var(--muted-foreground);
+  text-underline-offset: 4px;
+}
+.row-detail {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0 1rem 1rem;
+  font-size: 0.825rem;
+  line-height: 1.7;
+  background: color-mix(in oklab, var(--muted) 60%, transparent);
+}
+.row-detail p:last-child { color: var(--muted-foreground); }
+
+.data-table {
+  width: 100%;
+  min-width: 40rem;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.data-table th {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklab, var(--muted) 60%, transparent);
+  text-align: left;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.data-table td {
+  padding: 0.375rem 0.75rem;
+  vertical-align: top;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
+}
+.data-table tr:last-child td { border-bottom: 0; }
+.data-table tbody tr:hover { background: color-mix(in oklab, var(--muted) 40%, transparent); }
+.data-table tr.denied-row { background: color-mix(in oklab, var(--denied-wash) 60%, transparent); }
+.data-table td.muted { color: var(--muted-foreground); }
+
+.cards { display: grid; gap: 0.75rem; }
+.card { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; }
+.card.accent-border { border-color: color-mix(in oklab, var(--accent) 40%, transparent); }
+.card .id { font-family: var(--font-mono); font-size: 0.72rem; word-break: break-all; color: var(--muted-foreground); }
+.card.accent-border .id { color: var(--accent); }
+.card .value { margin-top: 0.5rem; font-family: var(--font-mono); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.card .value .note { margin-left: 0.5rem; color: var(--muted-foreground); }
+
+.diagram { border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
+.diagram svg { display: block; width: 100%; height: auto; min-width: 40rem; }
+.diagram text { font-family: var(--font-mono); }
+.diagram .node { fill: transparent; stroke: var(--border); stroke-width: 1; }
+.diagram .node.accent { fill: color-mix(in oklab, var(--accent-wash) 50%, transparent); stroke: var(--accent); stroke-dasharray: 4 3; }
+.diagram .node.denied { fill: color-mix(in oklab, var(--denied-wash) 50%, transparent); stroke: var(--denied); }
+.diagram .edge { fill: none; stroke: var(--muted-foreground); stroke-width: 1; opacity: 0.75; }
+.diagram .edge.accent { stroke: var(--accent); }
+.diagram .edge.denied { stroke: var(--denied); }
+.diagram .t-main { fill: var(--foreground); font-size: 11px; }
+.diagram .t-sub { fill: var(--muted-foreground); font-size: 9.5px; }
+.diagram .t-accent { fill: var(--accent); font-size: 11px; }
+.diagram .t-denied { fill: var(--denied); font-size: 11px; }
+
+.disclosure { border: 1px solid var(--border); border-radius: var(--radius); }
+.disclosure summary {
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.333;
+  color: var(--muted-foreground);
+  transition: color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.disclosure summary:hover { color: var(--foreground); }
+.disclosure dl {
+  display: grid;
+  gap: 0.5rem;
+  border-top: 1px solid var(--border);
+  padding: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+.disclosure dl > div { display: grid; gap: 0.25rem; }
+.disclosure dt { color: var(--accent); }
+.disclosure dd { color: var(--muted-foreground); }
+.disclosure dl > p { padding-top: 0.5rem; color: var(--muted-foreground); }
+
+.defs { display: grid; gap: 1.5rem; }
+.defs dt { font-size: 0.875rem; font-weight: 500; }
+.defs dd { margin-top: 0.25rem; font-size: 0.825rem; line-height: 1.7; color: var(--muted-foreground); }
+
+.page-footer { margin-top: 3.5rem; border-top: 1px solid var(--border); padding-top: 2rem; font-size: 0.825rem; display: grid; gap: 0.75rem; }
+.page-footer a.accent {
+  color: var(--accent);
+  text-underline-offset: 4px;
+  text-decoration-color: color-mix(in oklab, var(--accent) 40%, transparent);
+}
+.page-footer a.accent:hover { text-decoration-color: var(--accent); }
+
+.skip-link { position: absolute; left: -999px; top: 1rem; }
+.skip-link:focus {
+  left: 1rem;
+  z-index: 50;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.scroll-rail {
+  position: fixed;
+  top: 50%;
+  right: 1.5rem;
+  z-index: 40;
+  display: none;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.scroll-rail-track {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  width: 18px;
+  height: 450px;
+  touch-action: none;
+  user-select: none;
+  cursor: ns-resize;
+  pointer-events: auto;
+}
+.scroll-rail-slot {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: flex-end;
+  height: 10px;
+}
+.scroll-rail-dot {
+  display: block;
+  width: 2px;
+  height: 2px;
+  border-radius: 9999px;
+  opacity: 0.3;
+  background-color: var(--muted-foreground);
+}
+.scroll-rail-label {
+  position: absolute;
+  right: 100%;
+  margin-right: 0.75rem;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.scroll-rail-track:hover .scroll-rail-label { opacity: 1; }
+.scroll-rail-label[data-current="true"] { color: var(--accent); }
+
+@media (min-width: 768px) {
+  .page-header { padding-block: 8rem 6rem; }
+  .page-header h1 { font-size: 2.25rem; }
+  .section { padding-block: 6rem; }
+  .section h2 { font-size: 1.625rem; }
+  pre.code { font-size: 0.8rem; }
+  .row-detail { grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+}
+
+@media (min-width: 640px) {
+  .disclosure dl > div { grid-template-columns: 9rem minmax(0, 1fr); }
+  .cards.three { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (min-width: 1024px) {
+  .split { grid-template-columns: minmax(0, 1fr) 21rem; gap: 2.5rem; }
+  .split .aside { position: sticky; top: 2rem; align-self: start; }
+}
+
+@media (min-width: 1280px) {
+  .scroll-rail { display: block; }
+}
+
+@media print {
+  .scroll-rail { display: none; }
+  .section { break-inside: avoid-page; }
+}
+
+.prose ul { display: grid; gap: 0.25rem; padding-left: 1.25rem; list-style: disc; }
+</style>
+</head>
+<body>
+<main>
+  <a class="skip-link" href="#section-1">Aller à la première section</a>
+
+  <header id="intro" class="container-prose page-header" data-rail-label="Introduction">
+    <h1>La CLI TidyJS fonctionne et rend le même texte que VS Code, mais rien n'est commité et sa vitesse dépend encore des diagnostics.</h1>
+    <div class="lead">
+      <p>Ce document fait l'état des lieux de la session « CLI exploration » du 6 octobre 2026 (de 19 h 32 à 23 h 41). Il s'appuie sur le transcript de la session, sur le code présent dans le dépôt et sur des contrôles relancés le 7 octobre 2026. Chaque chiffre indique sa provenance : <strong>revérifié le 7 octobre</strong>, ou <strong>mesuré pendant la session</strong> et repris de son transcript.</p>
+      <p>Le travail est sur la branche <code>main</code>, sans commit, sans branche dédiée et sans publication npm. <code>git status</code> montre 32 fichiers suivis modifiés ou supprimés, dont <code>src/utils/config.ts</code>, <code>configLoader.ts</code> et <code>diagnostics-cache.ts</code>. Les nouveaux dossiers <code>src/core/</code>, <code>src/cli/</code>, <code>src/vscode/</code> et <code>test/compat/</code> ne sont pas suivis, pas plus que onze nouveaux fichiers de test.</p>
+      <p class="callout">La section 01 décrit ce qui existe, la 02 ce qu'il faut pour formater, la 03 le trajet d'un fichier. La 04 donne les preuves, la 05 le bilan des pistes gardées ou refusées, et la 06 ce qu'on peut encore tenter et ce qui reste à décider.</p>
+    </div>
+  </header>
+
+  <section id="section-1" class="section" data-rail-label="01 État">
+    <header class="container-prose">
+      <a class="section-number" href="#section-1">01</a>
+      <h2>Le moteur est sorti de VS Code, et deux adapters l'utilisent.</h2>
+    </header>
+    <div class="container-prose prose">
+      <p>La session est partie d'un cahier des charges collé en début de session : pas de simple wrapper, un core sans dépendance à VS Code, un adapter VS Code et un adapter CLI qui fournissent les mêmes abstractions, dont des diagnostics normalisés. Un premier POC avait existé sur une branche <code>feat/cli-poc</code>. La branche n'existe plus et son code est perdu. Il n'en reste que <code>plans/cli-poc.md</code>, dont les découvertes ont été réutilisées.</p>
+      <p><strong>Le découpage est en place.</strong> Dans <code>eslint.config.mjs</code>, une règle <code>no-restricted-imports</code> interdit d'importer <code>vscode</code> en dehors de <code>src/extension.ts</code> et de <code>src/vscode/</code>. Le provider de l'extension et le mode dossier passent par le même pipeline, <code>formatSource</code> dans <code>src/core/pipeline.ts</code>, avec deux profils : <code>editor</code> (format à l'enregistrement) et <code>folder</code> (Format Folder).</p>
+      <p>Le moteur de formatage n'a pas changé : <code>parser.ts</code>, l'IR et <code>formatter.ts</code> (5 lignes modifiées, pour sortir les notifications). Seuls les entrées (config, diagnostics, chemins) et les sorties (log, notifications) ont été déplacées.</p>
+    </div>
+    <div class="container-wide block stack-lg">
+      <div class="cards three">
+        <div class="card accent-border">
+          <div class="id">tsc · lint · 7 oct.</div>
+          <div class="value">OK<span class="note">, frontière vscode comprise</span></div>
+        </div>
+        <div class="card accent-border">
+          <div class="id">jest · 7 oct.</div>
+          <div class="value">92 suites, 1 092 tests<span class="note">, contre 77 et 864 avant la session</span></div>
+        </div>
+        <div class="card">
+          <div class="id">e2e extension · session</div>
+          <div class="value">61 réussis<span class="note">, VS Code 1.140, non relancés le 7</span></div>
+        </div>
+      </div>
+      <div class="frame">
+        <table class="data-table">
+          <thead><tr><th>couche</th><th>fichier</th><th>lignes</th><th>rôle</th></tr></thead>
+          <tbody>
+            <tr><td class="muted">core</td><td>src/core/config.ts</td><td>732</td><td>défauts, fusion, auto-order, validation, regex, recherche de .tidyjsrc / tidyjs.json (ex config.ts + configLoader.ts)</td></tr>
+            <tr><td class="muted">core</td><td>src/core/settings.ts</td><td>103</td><td>lecteur de réglages au contrat has/get de WorkspaceConfiguration</td></tr>
+            <tr><td class="muted">core</td><td>src/core/diagnostics.ts</td><td>202</td><td>TidyDiagnostic normalisé, analyse inutilisés / introuvables, filtre par position</td></tr>
+            <tr><td class="muted">core</td><td>src/core/pipeline.ts</td><td>333</td><td>formatSource : profils editor / folder, cache de parsers sensible aux regex</td></tr>
+            <tr><td class="muted">core</td><td>src/utils/path-resolver.ts</td><td>428 (+87 / −378)</td><td>une seule implémentation Node pour l'éditeur, le dossier et la CLI ; tsconfig lu en JSONC avec extends</td></tr>
+            <tr><td class="muted">vscode</td><td>src/vscode/*.ts</td><td>307</td><td>config-manager, config-loader, diagnostics (vscode.Diagnostic → TidyDiagnostic), log-sink, messages</td></tr>
+            <tr><td class="muted">cli</td><td>src/cli/cli.ts, args.ts, main.ts</td><td>435</td><td>entrée, options, session, workers, ordre déterministe des rapports</td></tr>
+            <tr><td class="muted">cli</td><td>src/cli/typescript-diagnostics.ts</td><td>726</td><td>LanguageService classique, API native TS 7, sélection de projet façon tsserver, projet inféré</td></tr>
+            <tr><td class="muted">cli</td><td>src/cli/eslint-diagnostics.ts</td><td>542</td><td>ESLint du projet, algorithme de l'extension ESLint (workingDirectories, customizations, validate, probe…)</td></tr>
+            <tr><td class="muted">cli</td><td>src/cli/eslint-host.ts</td><td>171</td><td>ESLint dans un processus séparé, prélecture avec contrôle d'empreinte</td></tr>
+            <tr><td class="muted">cli</td><td>src/cli/import-oracle.ts</td><td>287</td><td>analyse rapide des imports (section 03)</td></tr>
+            <tr><td class="muted">cli</td><td>src/cli/diagnostics.ts, runner.ts, reporter.ts, files.ts, workspace.ts, git.ts, parallel.ts</td><td>775</td><td>collecte, traitement par fichier, rapport, cibles et globs, racine, --changed / --staged, pool de workers</td></tr>
+            <tr><td class="muted">tests</td><td>test/compat/</td><td>—</td><td>fixtures, sorties enregistrées dans VS Code, harnais d'enregistrement, test CLI contre VS Code</td></tr>
+            <tr><td class="muted">docs</td><td>docs/cli.md, docs/cli-architecture.md</td><td>—</td><td>usage et architecture, en anglais comme le reste de docs/</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout stack">
+        <p><strong>Packaging préparé, rien de publié.</strong> <code>package.json</code> déclare <code>bin.tidyjs = ./dist/cli.js</code>, <code>engines.node &gt;= 20</code> et un <code>prepack</code> qui construit en production. <code>typescript</code> passe des devDependencies aux dependencies, pour servir de copie de secours. Un <code>.npmignore</code> ne livre que <code>dist/cli.js</code>, les deux docs CLI et le schéma. <code>.vscodeignore</code> exclut la CLI du <code>.vsix</code>.</p>
+        <p>Le même jour, une autre session a créé le ticket ClickUp TICKET-25347, « TidyJS : exécution en ligne de commande (CLI) », en Technical Story. Une session lancée à 22 h 50 avec <code>/plan</code> s'est arrêtée après l'exploration, sans rien modifier.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="section-2" class="section" data-rail-label="02 Prérequis">
+    <header class="container-prose">
+      <a class="section-number" href="#section-2">02</a>
+      <h2>Formater ne demande que Node et oxc-parser ; supprimer des imports demande le projet entier.</h2>
+    </header>
+    <div class="container-prose prose">
+      <p>TidyJS a deux besoins distincts. <strong>Trier, grouper et aligner</strong> est purement syntaxique : le fichier et sa configuration suffisent. <strong>Supprimer des imports</strong> (<code>removeUnusedImports</code>, <code>removeMissingModules</code>) exige de savoir ce que TypeScript et ESLint diraient du fichier. Dans VS Code, ces réponses viennent des diagnostics déjà publiés par l'éditeur. La CLI doit les calculer elle-même. Les deux options valent <code>false</code> par défaut, dans <code>src/core/config.ts</code> comme dans le <code>package.json</code>.</p>
+      <p>Le bundle <code>dist/cli.js</code> (1,37 Mo, ESM, avec shebang) embarque <code>jsonc-parser</code>, <code>tinyglobby</code>, <code>diff</code>, <code>@typescript-eslint/typescript-estree</code> et <code>@typescript-eslint/scope-manager</code>. Trois paquets restent externes et sont résolus à l'exécution : <code>oxc-parser</code>, <code>typescript</code> et <code>eslint</code>.</p>
+      <p>Le tableau ci-dessous a été vérifié le 7 octobre sur un projet jetable, sans <code>typescript</code> ni <code>eslint</code>, et sur une copie isolée du bundle.</p>
+    </div>
+    <div class="container-wide block stack">
+      <div class="frame">
+        <table class="data-table">
+          <thead><tr><th>niveau</th><th>prérequis</th><th>sinon</th><th>preuve</th></tr></thead>
+          <tbody>
+            <tr><td class="accent">0 · formater</td><td>Node ≥ 20 (champ engines ; testé en v22.22.2)</td><td>non testé sous 20</td><td class="muted">package.json</td></tr>
+            <tr class="denied-row"><td class="accent">0 · formater</td><td>paquet oxc-parser et son binding natif pour la plateforme</td><td class="denied">la CLI ne démarre pas</td><td class="muted">copie isolée de cli.js : ERR_MODULE_NOT_FOUND 'oxc-parser'</td></tr>
+            <tr><td class="accent">0 · formater</td><td>fichiers .ts .tsx .js .jsx ; config facultative</td><td>défauts : un groupe « Other », aucune suppression</td><td class="muted">projet jetable sans config : tri et alignement appliqués</td></tr>
+            <tr><td class="accent">1 · supprimer</td><td>TypeScript : celui du projet, sinon la copie de TidyJS (6.0.3 depuis l'alignement sur Yeap ; 5.9.3 lors du test)</td><td>avertissement, rien n'est retiré</td><td class="muted">projet sans TS : « inferred project, TypeScript 5.9.3 »</td></tr>
+            <tr class="denied-row"><td class="accent">1 · supprimer</td><td>dépendances du projet installées (node_modules)</td><td class="denied">removeMissingModules retire des imports valides</td><td class="muted">react absent : import retiré, useState laissé sans import</td></tr>
+            <tr><td class="accent">1 · supprimer</td><td>tsconfig.json ou jsconfig.json qui inclut le fichier</td><td>projet inféré avec les options de VS Code 1.140</td><td class="muted">module Preserve, moduleResolution Bundler, jsx react-jsx, strict</td></tr>
+            <tr><td class="accent">2 · parité VS Code</td><td>ESLint du projet (jamais embarqué), facultatif</td><td>silencieux, comme VS Code sans ESLint ; TS seul</td><td class="muted">« eslint: unavailable (not-installed) »</td></tr>
+            <tr><td class="accent">2 · parité VS Code</td><td>racine du workspace et .vscode/settings.json</td><td>racine = ancêtre avec .git ou .vscode, sinon cwd ; --root</td><td class="muted">src/cli/workspace.ts</td></tr>
+            <tr><td class="accent">2 · parité VS Code</td><td>même version de TypeScript que l'éditeur</td><td>écart possible</td><td class="muted">VS Code : « Use Workspace Version »</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="caption">Prérequis minimal pour formater : <span class="strong">Node et oxc-parser</span>. Pour supprimer : <span class="strong">TypeScript et les dépendances du projet installées</span>. ESLint n'est jamais obligatoire.</p>
+      <div class="frame">
+        <div class="frame-title">projet jetable, tidyjs.json avec les deux suppressions, sans react installé · 7 oct.</div>
+        <pre class="code"><code>typescript: used (inferred project, TypeScript 5.9.3, full analysis because 'react' does not resolve), 5 diagnostic(s)
+eslint: unavailable (not-installed, …/minproj), 0 diagnostic(s)
+unused names: b, useEffect, x
+missing modules: react, ./missing
+-import { b } from './b';
+-import { useState, useEffect } from 'react';
+-import x from './missing';
+ export const v = useState;</code></pre>
+      </div>
+      <p class="callout denied">Ce comportement n'est pas propre à la CLI : <code>removeMissingModules</code> retire l'import entier dont la source est introuvable, et VS Code ferait de même avec les mêmes diagnostics. Une fois un faux <code>react</code> installé dans <code>node_modules</code>, seuls <code>./missing</code>, <code>b</code>, <code>useEffect</code> et <code>x</code> sont retirés. Lancer la CLI avant <code>npm install</code>, en CI par exemple, est donc dangereux dès que cette option est active.</p>
+    </div>
+  </section>
+
+  <section id="section-3" class="section" data-rail-label="03 Trajet">
+    <header class="container-prose">
+      <a class="section-number" href="#section-3">03</a>
+      <h2>Un oracle tranche la plupart des fichiers ; les cas douteux passent par TypeScript et ESLint complets.</h2>
+    </header>
+    <div class="container-prose prose">
+      <p>La CLI résout d'abord la config du fichier avec le code de l'extension. Ensuite, si une suppression est active et que le fichier a des imports, elle cherche quels imports sont inutilisés ou introuvables. Le core reçoit des <code>TidyDiagnostic</code> et ne sait pas d'où ils viennent. Depuis la correction faite pendant la session, un diagnostic n'est retenu que s'il pointe dans la déclaration d'import qui lie le nom.</p>
+      <p><strong>L'oracle</strong> (<code>src/cli/import-oracle.ts</code>) compte les références de chaque import avec <code>@typescript-eslint/scope-manager</code>, l'analyse de portée d'ESLint. Il résout chaque module avec <code>ts.resolveModuleName</code> et les <code>declare module</code> ambiants du projet. Un import sans référence reçoit un 6133 synthétique, placé sur l'import. Comme VS Code retire tout nom signalé par TypeScript ou par ESLint, ESLint n'a alors pas besoin de tourner.</p>
+      <p><strong>Le fichier passe en analyse complète</strong> dès qu'un des critères suivants est vrai :</p>
+      <ul>
+        <li>fichier <code>.d.ts</code> ;</li>
+        <li>directive <code>@ts-check</code> ou <code>@ts-nocheck</code> ;</li>
+        <li>option <code>noCheck</code>, ou JS avec <code>checkJs: false</code> ;</li>
+        <li>suggestions TypeScript désactivées sans <code>noUnusedLocals</code> ;</li>
+        <li>erreur de parsing ;</li>
+        <li>nom cité dans <code>{@link}</code> (en .ts) ou dans des accolades JSDoc (en .js) ;</li>
+        <li>fabrique JSX en mode classique, ou import réassigné ;</li>
+        <li>import à plusieurs liaisons, toutes inutilisées (TypeScript émet alors un 6192 sans nom) ;</li>
+        <li>module qui ne se résout pas.</li>
+      </ul>
+      <p>Ces critères ont été mesurés sur TypeScript 5.9 et 6.0.</p>
+    </div>
+    <div class="container-wide block">
+      <div class="stack">
+        <div class="chips" data-tabs="trajet">
+          <button type="button" class="chip" aria-pressed="true" data-target="trajet-rapide">chemin rapide (défaut)</button>
+          <button type="button" class="chip" aria-pressed="false" data-target="trajet-complet">repli complet</button>
+          <button type="button" class="chip" aria-pressed="false" data-target="trajet-sans">sans diagnostics</button>
+        </div>
+        <div class="diagram" id="trajet-rapide">
+          <svg viewBox="0 0 780 200" role="img" aria-label="Chemin rapide">
+            <defs>
+              <marker id="arrow-default" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 1 L 7 4 L 0 7" fill="none" stroke="var(--muted-foreground)" stroke-width="1"/></marker>
+              <marker id="arrow-accent" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 1 L 7 4 L 0 7" fill="none" stroke="var(--accent)" stroke-width="1"/></marker>
+              <marker id="arrow-denied" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 1 L 7 4 L 0 7" fill="none" stroke="var(--denied)" stroke-width="1"/></marker>
+            </defs>
+            <rect class="node" x="8" y="60" width="120" height="64" rx="6"/>
+            <text class="t-main" x="68" y="88" text-anchor="middle">fichier + config</text>
+            <text class="t-sub" x="68" y="106" text-anchor="middle">.tidyjsrc, settings</text>
+            <path class="edge" d="M 128 92 L 166 92" marker-end="url(#arrow-default)"/>
+            <rect class="node accent" x="170" y="50" width="190" height="84" rx="6"/>
+            <text class="t-accent" x="265" y="80" text-anchor="middle">oracle</text>
+            <text class="t-sub" x="265" y="98" text-anchor="middle">scope-manager</text>
+            <text class="t-sub" x="265" y="114" text-anchor="middle">resolveModuleName, ambiants</text>
+            <path class="edge accent" d="M 360 92 L 398 92" marker-end="url(#arrow-accent)"/>
+            <rect class="node" x="402" y="60" width="150" height="64" rx="6"/>
+            <text class="t-main" x="477" y="88" text-anchor="middle">moteur TidyJS</text>
+            <text class="t-sub" x="477" y="106" text-anchor="middle">parse, IR, tri</text>
+            <path class="edge" d="M 552 92 L 590 92" marker-end="url(#arrow-default)"/>
+            <rect class="node" x="594" y="60" width="178" height="64" rx="6"/>
+            <text class="t-main" x="683" y="88" text-anchor="middle">reparse puis sortie</text>
+            <text class="t-sub" x="683" y="106" text-anchor="middle">liste, --diff, --write</text>
+            <path class="edge denied" d="M 265 134 L 265 172 L 400 172" marker-end="url(#arrow-denied)"/>
+            <text class="t-denied" x="410" y="176">cas incertain : repli complet</text>
+          </svg>
+        </div>
+        <div class="diagram" id="trajet-complet" hidden>
+          <svg viewBox="0 0 780 220" role="img" aria-label="Repli complet">
+            <rect class="node denied" x="8" y="76" width="120" height="64" rx="6"/>
+            <text class="t-denied" x="68" y="104" text-anchor="middle">oracle</text>
+            <text class="t-sub" x="68" y="122" text-anchor="middle">non tranché</text>
+            <path class="edge" d="M 128 98 L 176 52" marker-end="url(#arrow-default)"/>
+            <path class="edge" d="M 128 118 L 176 164" marker-end="url(#arrow-default)"/>
+            <rect class="node" x="180" y="16" width="220" height="64" rx="6"/>
+            <text class="t-main" x="290" y="44" text-anchor="middle">TypeScript du projet</text>
+            <text class="t-sub" x="290" y="62" text-anchor="middle">LanguageService ou API native TS 7</text>
+            <rect class="node" x="180" y="136" width="220" height="64" rx="6"/>
+            <text class="t-main" x="290" y="164" text-anchor="middle">ESLint du projet</text>
+            <text class="t-sub" x="290" y="182" text-anchor="middle">processus hôte, en parallèle</text>
+            <path class="edge accent" d="M 400 48 L 452 98" marker-end="url(#arrow-accent)"/>
+            <path class="edge accent" d="M 400 168 L 452 118" marker-end="url(#arrow-accent)"/>
+            <rect class="node accent" x="456" y="76" width="150" height="64" rx="6"/>
+            <text class="t-accent" x="531" y="104" text-anchor="middle">TidyDiagnostic[]</text>
+            <text class="t-sub" x="531" y="122" text-anchor="middle">union, filtre position</text>
+            <path class="edge" d="M 606 108 L 644 108" marker-end="url(#arrow-default)"/>
+            <rect class="node" x="648" y="76" width="124" height="64" rx="6"/>
+            <text class="t-main" x="710" y="104" text-anchor="middle">moteur</text>
+            <text class="t-sub" x="710" y="122" text-anchor="middle">puis sortie</text>
+          </svg>
+        </div>
+        <div class="diagram" id="trajet-sans" hidden>
+          <svg viewBox="0 0 780 120" role="img" aria-label="Sans diagnostics">
+            <rect class="node" x="8" y="28" width="160" height="64" rx="6"/>
+            <text class="t-main" x="88" y="56" text-anchor="middle">fichier + config</text>
+            <text class="t-sub" x="88" y="74" text-anchor="middle">suppressions inactives</text>
+            <path class="edge accent" d="M 168 60 L 266 60" marker-end="url(#arrow-accent)"/>
+            <rect class="node accent" x="270" y="28" width="200" height="64" rx="6"/>
+            <text class="t-accent" x="370" y="56" text-anchor="middle">moteur TidyJS</text>
+            <text class="t-sub" x="370" y="74" text-anchor="middle">oxc-parser seul</text>
+            <path class="edge" d="M 470 60 L 568 60" marker-end="url(#arrow-default)"/>
+            <rect class="node" x="572" y="28" width="200" height="64" rx="6"/>
+            <text class="t-main" x="672" y="56" text-anchor="middle">reparse puis sortie</text>
+            <text class="t-sub" x="672" y="74" text-anchor="middle">ni TypeScript ni ESLint</text>
+          </svg>
+        </div>
+        <p class="callout neutral">Le chemin rapide ne s'active que si TypeScript et ESLint sont tous deux autorisés. Avec <code>--no-eslint</code>, la condition <code>this.typescript &amp;&amp; this.eslint</code> de <code>src/cli/diagnostics.ts</code> est fausse et l'analyse TypeScript est toujours complète. Pour un projet en TypeScript 7, l'oracle ne s'applique pas non plus, faute d'API JavaScript classique : tout passe par l'API native. <code>--no-diagnostics</code> ou <code>--profile folder</code> sautent tout le calcul.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="section-4" class="section" data-rail-label="04 Preuves">
+    <header class="container-prose">
+      <a class="section-number" href="#section-4">04</a>
+      <h2>Tous les fichiers comparés sont identiques à VS Code, mais la CLI reste en secondes face aux millisecondes de l'éditeur.</h2>
+    </header>
+    <div class="container-prose prose">
+      <p>La parité se mesure sur le fichier entier, octet par octet, contre la sortie de l'extension enregistrée dans un vrai VS Code 1.140 (<code>test/compat/vscode/record.mjs</code>). Le banc attend que les diagnostics de TypeScript et d'ESLint soient stables, lance Format Document et enregistre le résultat. Sur Yeap-UI-Apps, la moitié des fichiers échantillonnés a reçu deux sondes : <code>import { useId as tidyjsUnusedProbe } from 'react'</code> et un import de <code>./tidyjs-missing-probe</code>.</p>
+      <p><strong>Ce n'est pas une preuve générale.</strong> Ce sont des échantillons, et pendant ces tests VS Code tournait en TS 6.0.3 (Yeap) ou 5.9 (fixtures), jamais en TS 7. La comparaison couvre aussi les tris hors imports (<code>sortEnumMembers</code>, <code>sortExports</code>, <code>sortClassProperties</code>, <code>sortTypeMembers</code>), actifs dans le <code>tidyjs.json</code> racine de Yeap : 24 des 200 fichiers ont changé au-delà du bloc d'imports.</p>
+    </div>
+    <div class="container-wide block stack-lg">
+      <div class="cards three">
+        <div class="card accent-border">
+          <div class="id">1 fichier Yeap, chemin rapide · 7 oct.</div>
+          <div class="value">0,31 à 0,34 s<span class="note">, ESLint non démarré</span></div>
+        </div>
+        <div class="card">
+          <div class="id">même fichier, --no-fast-analysis · 7 oct.</div>
+          <div class="value">2,68 s<span class="note">, TS 6.0.3 + ESLint</span></div>
+        </div>
+        <div class="card">
+          <div class="id">même fichier, --no-diagnostics · 7 oct.</div>
+          <div class="value">0,19 s<span class="note">, formatage seul</span></div>
+        </div>
+      </div>
+      <div class="frame">
+        <div class="frame-title">parité CLI contre VS Code</div>
+        <table class="data-table">
+          <thead><tr><th>banc</th><th>résultat</th><th>source</th></tr></thead>
+          <tbody>
+            <tr><td>Yeap, 200 fichiers (100 avec sondes), chemin rapide</td><td class="accent">200/200 identiques, 0 avertissement</td><td class="muted">relancé le 7 oct.</td></tr>
+            <tr><td>Yeap, 200 fichiers, --no-fast-analysis</td><td class="accent">200/200 identiques</td><td class="muted">relancé le 7 oct.</td></tr>
+            <tr><td>Yeap, 40 fichiers (20 avec sondes), les deux modes</td><td class="accent">40/40 identiques</td><td class="muted">relancé le 7 oct.</td></tr>
+            <tr><td>fichiers tranchés par l'oracle sur ces bancs</td><td>100/200 et 20/40 : les fichiers avec sonde ont un module introuvable, donc repli</td><td class="muted">relancé le 7 oct.</td></tr>
+            <tr><td>fixtures test/compat (22 fichiers), 4 variantes : rapide, workers, complet, TS 7</td><td class="accent">identiques, sauf 1 écart voulu (config invalide)</td><td class="muted">Jest du 7 oct. ; TS 7 seulement si .vscode-test/ts7 existe</td></tr>
+            <tr><td>Yeap, 20 et 200 fichiers, variantes TS 7 et 2 workers</td><td class="accent">20/20 et 200/200 identiques</td><td class="muted">session</td></tr>
+            <tr><td>chemin rapide contre analyse complète, 1 976 fichiers Yeap, réels et avec sondes</td><td class="accent">0 fichier différent ; 1 seul repli sur le code réel ({@link getDateFormat})</td><td class="muted">session</td></tr>
+            <tr><td>diagnostics utiles de apps/paye, TS 6 contre TS 7, hors VS Code</td><td>mêmes 11 diagnostics</td><td class="muted">session</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="frame">
+        <div class="frame-title">vitesse sur Yeap · mesures de la session, médiane de 3 passages</div>
+        <table class="data-table">
+          <thead><tr><th>cas</th><th>1re version</th><th>TS 6 complet</th><th>--typescript 7</th><th>chemin rapide</th><th>VS Code</th></tr></thead>
+          <tbody>
+            <tr><td>1 fichier</td><td>3,4 s</td><td>2,2 à 2,3 s</td><td>0,95 à 1,0 s</td><td class="accent">0,4 s</td><td>3 à 34 ms (médiane 14 ms)</td></tr>
+            <tr><td>20 fichiers</td><td>—</td><td>4,7 à 7,3 s</td><td>2,4 s</td><td class="accent">0,56 s</td><td>0,3 s au total</td></tr>
+            <tr><td>1 124 fichiers (apps/paye/src/@app/dossier)</td><td>23 s</td><td>14,8 s</td><td>6,7 s</td><td>—</td><td>—</td></tr>
+            <tr><td>1 976 fichiers (paye, pdf, ds)</td><td>—</td><td>24 s</td><td>—</td><td class="accent">9 s</td><td>—</td></tr>
+            <tr><td>sans diagnostics, 1 124 fichiers</td><td>1,7 s</td><td>1,7 s</td><td>1,7 s</td><td>—</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout stack">
+        <p>Pour 20 fichiers en TS 6 complet, la session donne 7,3 s dans une mesure et 4,7 s dans une autre : les deux chiffres sont repris tels quels. Le premier concernait deux projets TypeScript (<code>apps/paye</code> et <code>packages/ds</code>), donc deux programmes à construire. Le temps de VS Code mesure le formatage d'un fichier déjà ouvert : ses serveurs TypeScript et ESLint tournent déjà en mémoire.</p>
+        <p>D'après le profil de la session, le formatage seul prend environ 1,5 ms par fichier. Pour un fichier en chemin rapide, le temps se répartit ainsi : environ 40 ms de démarrage de Node, 85 ms pour charger TypeScript, puis l'oracle. Le cœur d'ESLint (350 ms) et la config ESLint de Yeap (environ 0,7 s par répertoire de travail) ne sont payés qu'en cas de repli.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="section-5" class="section" data-rail-label="05 Pistes">
+    <header class="container-prose">
+      <a class="section-number" href="#section-5">05</a>
+      <h2>Les outils plus rapides ont été mesurés, et aucun ne reproduit seul la règle de VS Code.</h2>
+    </header>
+    <div class="container-prose prose">
+      <p>La règle à reproduire est l'union lue par l'extension : un nom est retiré si TypeScript (6133, 6196) ou la règle <code>@typescript-eslint/no-unused-vars</code> le signale, et un module est retiré si TypeScript émet un 2307 ou un 2318. <strong>Tout outil qui n'applique qu'une seule de ces deux règles, ou une approximation, rompt la parité.</strong> Cliquer une ligne pour en voir le détail.</p>
+    </div>
+    <div class="container-wide block">
+      <div class="frame">
+        <div class="table-head"><span>piste</span><span>verdict</span></div>
+        <ul class="verdict-list">
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-api"><span class="label">A · API TypeScript + API ESLint appelées depuis Node</span><span class="verdict accent">retenu</span></button>
+            <div class="row-detail" id="p-api" hidden>
+              <p>Option A de la comparaison A/B/C (<code>docs/cli-architecture.md</code>, §2). Ce sont les mêmes moteurs que ceux de l'éditeur. La CLI choisit le projet comme tsserver : tsconfig ou jsconfig, références, ancêtres, sinon projet inféré. Côté ESLint, elle reprend l'algorithme de l'extension ESLint, relu dans son code minifié : <code>workingDirectories</code>, <code>!cwd</code>, customizations, <code>quiet</code>, <code>validate</code>, <code>probe</code>, <code>nodePath</code>. Avec ESLint 9, <code>ruleFilter</code> limite l'exécution aux règles utiles.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-headless"><span class="label">B · VS Code headless comme moteur d'exécution</span><span class="verdict">écarté</span></button>
+            <div class="row-detail" id="p-headless" hidden>
+              <p>Démarrage d'Electron, xvfb sous Linux, attente des diagnostics : trop lourd et instable pour une CLI. VS Code n'est gardé que comme banc d'enregistrement des sorties de référence (<code>npm run test:compat:record</code>). L'option C, hybride, a été écartée pour la même raison.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-oracle"><span class="label">Oracle d'imports (scope-manager + résolution TS), repli exact</span><span class="verdict accent">retenu</span></button>
+            <div class="row-detail" id="p-oracle" hidden>
+              <p>C'est le défaut actuel ; <code>--no-fast-analysis</code> le désactive. Il fait passer un fichier de 2,3 s à 0,4 s sur Yeap, sans écart observé. Ses limites, reconnues en fin de session : environ 300 lignes de règles maison qui doivent suivre TypeScript et typescript-eslint, une hypothèse (une référence pour ESLint en est une pour TypeScript) vérifiée sur Yeap mais pas démontrée, des modules ambiants recensés en partie seulement (dans ce cas, il se replie), et aucun effet pour les projets en TS 7.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-exact"><span class="label">Optimisations exactes : fichiers sans import, ESLint en processus séparé avec prélecture, saut d'ESLint si seul removeMissingModules et aucun module manquant</span><span class="verdict accent">retenu</span></button>
+            <div class="row-detail" id="p-exact" hidden>
+              <p>Aucune ne change le résultat. ESLint tourne dans un processus, pas dans un thread, pour garder <code>process.chdir</code> possible. Son processus ne démarre qu'au premier fichier qui en a besoin.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-workers"><span class="label">Workers --jobs (auto : 2 au maximum, à partir de 800 fichiers)</span><span class="verdict accent">retenu</span></button>
+            <div class="row-detail" id="p-workers" hidden>
+              <p><code>FILES_PER_WORKER = 400</code> et <code>MAX_AUTOMATIC_WORKERS = 2</code> dans <code>src/cli/parallel.ts</code>. Au-delà de deux workers en TS 6, chaque worker revérifie les déclarations partagées : sur 1 124 fichiers, quatre workers consommaient 2,4 fois le CPU pour un gain moindre. Cette option a été écartée.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-git"><span class="label">--changed et --staged</span><span class="verdict accent">retenu</span></button>
+            <div class="row-detail" id="p-git" hidden>
+              <p>Option 4 de la session : ne traiter que les fichiers modifiés depuis <code>HEAD</code> (plus les non suivis), ou les fichiers indexés. Le coût fixe de chargement reste, mais il n'est payé qu'une fois.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-ts7"><span class="label">TypeScript 7 (API native typescript/unstable/sync)</span><span class="verdict contested">litigieux</span></button>
+            <div class="row-detail" id="p-ts7" hidden>
+              <p>Utilisé automatiquement si le projet est en TS 7, sinon avec <code>--typescript &lt;dossier&gt;</code>. En analyse complète, il divise le temps par trois environ. Les résultats sont identiques sur les bancs Yeap, mais rien ne le garantit : TS 7 a supprimé <code>baseUrl</code> (TS5102) et refuse les <code>paths</code> non relatifs (TS5090), ce que la session a constaté sur le tsconfig de TidyJS lui-même. Un projet qui en dépend verrait des modules « introuvables » que TS 6 trouve. VS Code n'a jamais tourné en TS 7 dans les tests. Pendant l'essai, l'installation de TS 7 sous alias avait remplacé le binaire <code>tsc</code> de <code>node_modules/.bin</code>. L'alias a été retiré, et TS 7 vit désormais dans <code>.vscode-test/ts7</code> (<code>npm run test:ts7:setup</code>).</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-untyped"><span class="label">ESLint sans informations de types</span><span class="verdict">écarté</span></button>
+            <div class="row-detail" id="p-untyped" hidden>
+              <p>Rien à gagner sur Yeap, qui n'active pas le linting typé. Ailleurs, un parse non typé ne fait pas échouer les fichiers hors projet, alors que le parse typé de l'éditeur échoue sur ces fichiers et ne signale alors aucun nom inutilisé. Le résultat pourrait donc différer.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-skipeslint"><span class="label">Sauter ESLint dès que TypeScript signale des noms</span><span class="verdict">écarté</span></button>
+            <div class="row-detail" id="p-skipeslint" hidden>
+              <p>Ce n'est pas exact : ESLint signale des noms que TypeScript juge utilisés (<code>{@link}</code>, <code>@ts-nocheck</code>, <code>jsxPragma</code> différent). Seule la forme exacte a été gardée, à travers l'oracle.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-reduced"><span class="label">Programme TypeScript réduit aux fichiers utiles</span><span class="verdict">écarté</span></button>
+            <div class="row-detail" id="p-reduced" hidden>
+              <p>Diagnostics identiques sur 96 fichiers, mais le programme chargeait encore 3 087 fichiers sur 3 226 à cause des imports denses de l'application. On gagne 1,5 s contre 2,0 s, ce qui ne vaut pas le risque.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-bun"><span class="label">bun check (Bun 1.4.3 canary)</span><span class="verdict">écarté</span></button>
+            <div class="row-detail" id="p-bun" hidden>
+              <p>Il vérifie tout <code>apps/paye</code> en 2,2 s, même pour un seul fichier. Avec <code>--noUnusedLocals --noUnusedParameters</code>, il trouve les mêmes diagnostics que TS 6. Il a été refusé pour plusieurs raisons : il ne donne que les erreurs de <code>tsc</code>, donc pas les suggestions que lit VS Code (JS sans <code>checkJs</code>, fichiers hors tsconfig) ; sa sortie est du texte, pas une API ; il n'existe qu'en canary ; il applique les règles de TS 7. Il a été testé avec une copie téléchargée dans le scratchpad de la session.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-oxlint"><span class="label">oxlint (oxc, Rust) à la place d'ESLint</span><span class="verdict contested">mesuré, non intégré</span></button>
+            <div class="row-detail" id="p-oxlint" hidden>
+              <p>Tout Yeap (1 962 fichiers) passe en 0,26 s, contre 7,5 s pour ESLint, et 1 ou 20 fichiers en 0,06 s. Ses décisions sur les imports inutilisés sont identiques à celles de VS Code sur les 1 962 fichiers. Sur 15 cas limites, il diffère une fois : <code>import React</code> avec <code>jsx: react-jsx</code>, que TypeScript juge inutilisé et qu'ESLint garde. Il ne remplace donc que la partie ESLint. Il ne lit pas la config ESLint : il faut lui recopier les options de <code>no-unused-vars</code> (<code>^_</code> chez Yeap). Gain estimé, non mesuré : environ 0,3 s par lancement.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-tsgolint"><span class="label">oxlint --type-aware --type-check (tsgolint, typescript-go)</span><span class="verdict contested">mesuré, non intégré</span></button>
+            <div class="row-detail" id="p-tsgolint" hidden>
+              <p>Sur 20 fichiers Yeap, il trouve les 20 inutilisés et les 10 modules manquants injectés (20 <code>no-unused-vars</code>, 10 <code>TS2307</code>). Il traite 1 fichier en 0,7 à 1,0 s et 20 fichiers en 1,4 s. Il ne garantit pas la parité : il tourne en TS 7, il ne remonte que les erreurs (pas les suggestions, donc le cas React disparaît) et il ignore la config ESLint. Il cherche <code>tsgolint</code> dans le projet analysé ; la session l'a installé dans le scratchpad.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-oxcother"><span class="label">oxc-resolver, Oxfmt, oxc-transform, oxc-minify</span><span class="verdict">écarté</span></button>
+            <div class="row-detail" id="p-oxcother" hidden>
+              <p>oxc-resolver résout comme Node, pas comme TypeScript : il ignore les paquets qui n'ont que des <code>@types</code> et les <code>declare module '*.css'</code>, et pourrait faire supprimer un import valide. Oxfmt formate le style à la manière de Prettier, sans les groupes ni l'alignement de TidyJS. Les deux autres n'ont pas de rapport avec le problème. oxc-parser, lui, est le parser de TidyJS depuis le début.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-isolated"><span class="label">TypeScript sur le fichier seul (noResolve, noLib)</span><span class="verdict contested">mesuré, non implémenté</span></button>
+            <div class="row-detail" id="p-isolated" hidden>
+              <p>L'idée vient de <code>prettier-plugin-organize-imports</code>, dont le service ne contient que le fichier traité (<code>getScriptFileNames: () =&gt; [path]</code>). Sur 1 963 fichiers Yeap, elle donne les mêmes diagnostics « inutilisé » que le programme complet, code et position compris, en 6,3 s (3,2 ms par fichier) contre 24,7 s. Elle remplacerait les règles maison de l'oracle côté TypeScript. Les modules manquants resteraient à la résolution : d'après <code>plans/cli-poc.md</code>, en <code>noResolve</code>, TypeScript émet un 2307 pour tous les imports. L'ancien POC perdu suivait déjà cette voie (1 fichier en 0,26 s sans ESLint).</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-linter"><span class="label">ESLint réduit à une règle (classe Linter, config en mémoire)</span><span class="verdict contested">mesuré, non implémenté</span></button>
+            <div class="row-detail" id="p-linter" hidden>
+              <p>Il donne les mêmes résultats <code>no-unused-vars</code> que l'ESLint du projet sur 1 964 fichiers, sondes comprises. Les 5 écarts bruts venaient d'un <code>eslint-disable</code> visant une règle non chargée. Coût : 2,4 ms par fichier, plus 0,35 s de chargement. Il faut connaître les options exactes de la règle et savoir si elle est active pour chaque fichier. Ces informations sont dans <code>eslint.config.js</code>, du code avec plugins, et le seul moyen exact de les lire est de charger la config (0,7 s). Pour la mesure, elles ont été recopiées à la main.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-daemon"><span class="label">Processus résident (à la eslint_d, prettierd)</span><span class="verdict">refusé</span></button>
+            <div class="row-detail" id="p-daemon" hidden>
+              <p>Refus catégorique le 7 octobre 2026 : cette piste ne sera pas étudiée.</p>
+            </div>
+          </li>
+          <li>
+            <button type="button" class="table-row-button" aria-expanded="false" data-expand="p-search"><span class="label">Projet existant qui ferait déjà ce travail</span><span class="verdict">non trouvé</span></button>
+            <div class="row-detail" id="p-search" hidden>
+              <p>Recherche web faite en fin de session (prettier-plugin-organize-imports, PR TypeScript #50931, issue VS Code #148790, TSSLint, @ttsc/lint). Aucun outil ne reproduit l'union TypeScript + ESLint que lit l'extension : chacun applique sa propre règle.</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <p class="caption">Retenus : <span class="strong">5</span>. Écartés ou refusés : <span class="strong">7</span>, plus une recherche sans résultat. Mesurés sans intégration : <span class="strong">4</span>. TS 7 est intégré en option, mais reste litigieux.</p>
+    </div>
+  </section>
+
+  <section id="section-6" class="section" data-rail-label="06 Suite">
+    <header class="container-prose">
+      <a class="section-number" href="#section-6">06</a>
+      <h2>Il reste des contournements utilisables tout de suite, et quatre décisions à prendre.</h2>
+    </header>
+    <div class="container-prose prose">
+      <p>La session s'est arrêtée sur une proposition non tranchée, avec deux points : remplacer les règles de l'oracle par TypeScript sur le fichier seul et ESLint réduit, et passer la copie TypeScript de la CLI en 6.x. Rien n'a été modifié dans TidyJS après les deux dernières questions (23 h 33 et 23 h 39). Les prototypes d'oxlint, de Bun, de l'oracle et des cœurs embarqués sont restés dans le scratchpad temporaire de la session, <code>/private/tmp/…/512aade5-…/scratchpad</code>, qui n'est pas pérenne.</p>
+    </div>
+    <footer class="container-prose">
+      <dl class="defs block">
+        <div><dt>À décider · branche et commit</dt><dd>Tout est non commité sur <code>main</code>. Il faut créer une branche, puis faire relire avant de commiter. Ni commit ni push n'ont été faits.</dd></div>
+        <div><dt>À décider · corrections du core qui changent l'extension</dt><dd>Quatre corrections touchent aussi VS Code. Un import n'est plus retiré à cause d'un homonyme : ce défaut a été prouvé dans VS Code sur <code>ReglementFormProvider.ts</code> (TS2552 après formatage). Le parser est recréé quand seule une regex change. Le tsconfig des alias est lu en JSONC avec <code>extends</code> : l'ancienne regex cassait le JSON avec <code>"@app/*"</code> puis <code>"src/**/*.ts"</code>. Enfin, l'éditeur utilise désormais le résolveur Node du mode dossier.</dd></div>
+        <div><dt>Fait le 7 octobre · alignement sur Yeap-UI-Apps</dt><dd>TidyJS utilise désormais les versions de Yeap : <code>typescript</code> 6.0.3 (copie de secours et parser de l'oracle), <code>typescript-eslint</code> et <code>@typescript-eslint/*</code> 8.60.0, <code>eslint</code> 9.39.4, <code>@types/node</code> 24.10.0. Le tsconfig de TidyJS perd <code>baseUrl</code>, que TypeScript 6 refuse (TS5101).</dd></div>
+        <div><dt>À décider · publication et CLAUDE.md</dt><dd>Le paquet npm est prêt mais pas publié. Un ajout à la section Architecture de <code>CLAUDE.md</code> a été proposé (core, adapters, <code>test:compat:record</code>), mais pas appliqué.</dd></div>
+        <div><dt>Contournement · ne rien supprimer</dt><dd><code>--no-diagnostics</code> (0,19 s par fichier mesuré le 7 octobre) ou <code>--profile folder</code> : tri et alignement seuls, sans TypeScript ni ESLint. Cela convient à un pre-commit rapide, mais les imports inutilisés ne sont pas retirés.</dd></div>
+        <div><dt>Contournement · limiter le lot</dt><dd><code>--staged</code> en pre-commit, <code>--changed</code> en local, <code>--check</code> en CI, après <code>npm ci</code> pour que les modules se résolvent.</dd></div>
+        <div><dt>Contournement · ne toucher qu'aux imports</dt><dd>Mettre <code>sortEnumMembers</code>, <code>sortExports</code>, <code>sortClassProperties</code> et <code>sortTypeMembers</code> à <code>false</code> dans <code>tidyjs.json</code>. Cela change aussi le comportement de l'extension, et la parité reste la même.</dd></div>
+        <div><dt>Contournement · aligner l'environnement</dt><dd>Dans VS Code, « Use Workspace Version » pour avoir le même TypeScript. Un <code>jsconfig.json</code>, ou des <code>@types</code> installés, suppriment l'écart dû à l'acquisition automatique de types pour les JS hors tsconfig. <code>--typescript</code> vers TS 7 accélère le repli, sans garantie de parité.</dd></div>
+        <div><dt>Piste à coder · cœurs embarqués exacts</dt><dd>TypeScript sur le fichier seul pour les inutilisés, résolution TS et <code>declare module</code> pour les modules, et ESLint du projet chargé seulement pour un import sans référence que TypeScript ne signale pas. D'après la session, cela fait moins de règles maison pour un temps comparable, autour de 0,35 à 0,4 s par fichier.</dd></div>
+        <div><dt>Piste à coder · oxlint pour la part ESLint</dt><dd>Les options de <code>no-unused-vars</code> seraient lues une fois depuis ESLint, puis mises en cache. Gain estimé : environ 0,3 s par lancement. L'équivalence avec ESLint est observée sur Yeap, pas garantie ailleurs.</dd></div>
+        <div><dt>Écarts connus avec VS Code</dt><dd>Plusieurs écarts sont connus : config invalide refusée par la CLI (exit 2) alors que le format à l'enregistrement formate quand même ; délai de publication des diagnostics dans l'éditeur ; acquisition automatique de types ; plugins tsserver ; messages TypeScript localisés (la regex est en anglais) ; réglages utilisateur non lus ; une racine par exécution.</dd></div>
+        <div><dt>Comportements 1.9.2 conservés, non corrigés</dt><dd>Un import namespace inutilisé n'est jamais retiré, car l'analyse compare <code>ns</code> à <code>* as ns</code>. Seul <code>@typescript-eslint/no-unused-vars</code> est reconnu, pas <code>no-unused-vars</code>. Le 6192 ne nomme aucun import.</dd></div>
+        <div><dt>Incohérence de documentation</dt><dd>Au §1, <code>docs/cli-architecture.md</code> indique que <code>eslint.rules.customizations</code> n'est pas reproduit. Or <code>docs/cli.md</code> et le code (<code>customizedSeverity</code> dans <code>eslint-diagnostics.ts</code>) le prennent en charge.</dd></div>
+      </dl>
+      <div class="page-footer">
+        <p><a class="accent" href="cli.md">docs/cli.md</a><span class="muted"> : options, codes de sortie, configuration, diagnostics, vitesse.</span></p>
+        <p><a class="accent" href="cli-architecture.md">docs/cli-architecture.md</a><span class="muted"> : couplage VS Code analysé, options A/B/C, écarts, oracle, modèle d'exécution.</span></p>
+        <p><a class="accent" href="fonctionnement-tidyjs.html">docs/fonctionnement-tidyjs.html</a><span class="muted"> : fonctionnement du moteur de l'extension 1.9.2.</span></p>
+      </div>
+      <p class="caption" style="margin-top:3rem">Sources : transcript de la session « CLI exploration » (6 oct. 2026), plans/cli.md, plans/cli-poc.md, code du dépôt, contrôles et bancs relancés le 7 oct. 2026.</p>
+    </footer>
+  </section>
+</main>
+
+<script>
+document.querySelectorAll("[data-tabs]").forEach((group) => {
+  const buttons = group.querySelectorAll(".chip");
+  buttons.forEach((button) => {
+    button.addEventListener("click", () => {
+      buttons.forEach((other) => {
+        const selected = other === button;
+        other.setAttribute("aria-pressed", String(selected));
+        document.getElementById(other.dataset.target).hidden = !selected;
+      });
+    });
+  });
+});
+
+const expanders = [...document.querySelectorAll("[data-expand]")];
+expanders.forEach((button) => {
+  button.addEventListener("click", () => {
+    const open = button.getAttribute("aria-expanded") === "true";
+    expanders.forEach((other) => {
+      const selected = other === button && !open;
+      other.setAttribute("aria-expanded", String(selected));
+      document.getElementById(other.dataset.expand).hidden = !selected;
+    });
+  });
+});
+
+const railEntries = [...document.querySelectorAll("[data-rail-label]")];
+const RAIL_TICKS = 45;
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const rail = document.createElement("div");
+rail.className = "scroll-rail";
+rail.setAttribute("aria-hidden", "true");
+const track = document.createElement("div");
+track.className = "scroll-rail-track";
+const dots = [];
+for (let index = 0; index < RAIL_TICKS; index++) {
+  const slot = document.createElement("span");
+  slot.className = "scroll-rail-slot";
+  const dot = document.createElement("span");
+  dot.className = "scroll-rail-dot";
+  slot.appendChild(dot);
+  track.appendChild(slot);
+  dots.push(dot);
+}
+const railLabels = railEntries.map((entry) => {
+  const label = document.createElement("span");
+  label.className = "scroll-rail-label";
+  label.textContent = entry.dataset.railLabel;
+  track.appendChild(label);
+  return label;
+});
+rail.appendChild(track);
+document.body.appendChild(rail);
+
+let railPositions = [];
+let frame = 0;
+const maxScroll = () => document.documentElement.scrollHeight - window.innerHeight;
+const measure = () => {
+  const range = maxScroll();
+  railPositions = railEntries.map((entry) => (range <= 0 ? 0 : (RAIL_TICKS - 1) * clamp((entry.getBoundingClientRect().top + window.scrollY) / range, 0, 1)));
+  railLabels.forEach((label, index) => { label.style.top = `${10 * railPositions[index] + 5}px`; });
+};
+const paint = () => {
+  frame = 0;
+  const range = maxScroll();
+  const cursor = (range > 0 ? clamp(window.scrollY / range, 0, 1) : 0) * (RAIL_TICKS - 1);
+  const marked = new Set(railPositions.map((position) => Math.round(position)));
+  dots.forEach((dot, index) => {
+    const distance = index - cursor;
+    const weight = Math.exp(-(distance * distance) / 5.12);
+    const isMarked = marked.has(index);
+    dot.style.width = `${Math.max(2 + 16 * weight, isMarked ? 6 : 0).toFixed(2)}px`;
+    dot.style.opacity = `${Math.max(0.28 + 0.72 * weight, isMarked ? 0.45 : 0).toFixed(3)}`;
+    dot.style.backgroundColor = `color-mix(in oklch, var(--accent) ${(100 * weight).toFixed(1)}%, var(--muted-foreground))`;
+  });
+  let current = -1;
+  railPositions.forEach((position, index) => { if (cursor >= position - 0.5) current = index; });
+  railLabels.forEach((label, index) => { label.dataset.current = String(index === current); });
+};
+const schedulePaint = () => { if (!frame) frame = requestAnimationFrame(paint); };
+const remeasure = () => { measure(); schedulePaint(); };
+const scrollToPointer = (clientY) => {
+  const box = track.getBoundingClientRect();
+  window.scrollTo({ top: clamp((clientY - box.top) / box.height, 0, 1) * maxScroll(), behavior: "auto" });
+};
+track.addEventListener("pointerdown", (event) => { event.preventDefault(); track.setPointerCapture(event.pointerId); scrollToPointer(event.clientY); });
+track.addEventListener("pointermove", (event) => { if (track.hasPointerCapture(event.pointerId)) scrollToPointer(event.clientY); });
+measure();
+paint();
+window.addEventListener("scroll", schedulePaint, { passive: true });
+window.addEventListener("resize", remeasure);
+new ResizeObserver(remeasure).observe(document.documentElement);
+</script>
+</body>
+</html>

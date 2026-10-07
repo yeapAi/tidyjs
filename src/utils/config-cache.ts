@@ -3,7 +3,7 @@
  */
 
 import { Config } from '../types';
-import { cloneDeepWith } from './deep-clone';
+import { cloneConfig, serializeConfig } from '../core/config';
 
 export class ConfigCache {
     private lastConfigString = '';
@@ -55,23 +55,13 @@ export class ConfigCache {
      * Serialize config with proper RegExp handling for cache comparison
      */
     private serializeConfig(config: Config): string {
-        return JSON.stringify(config, (key, value) => {
-            if (value instanceof RegExp) {
-                return `__REGEXP__${value.source}__FLAGS__${value.flags}`;
-            }
-            return value;
-        });
+        return serializeConfig(config);
     }
 
     /**
      * Deep clone config with RegExp handling
      */
     private deepClone(config: Config): Config {
-        return cloneDeepWith(config, (value) => {
-            if (value instanceof RegExp) {
-                return new RegExp(value.source, value.flags);
-            }
-            return undefined;
-        });
+        return cloneConfig(config);
     }
 }

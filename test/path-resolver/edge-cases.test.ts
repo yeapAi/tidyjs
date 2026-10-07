@@ -1,5 +1,4 @@
 import { extractTsConfigPaths, PathResolver } from '../../src/utils/path-resolver';
-import type { TextDocument } from 'vscode';
 
 jest.mock('../../src/utils/log', () => ({
     logDebug: jest.fn(),
@@ -58,20 +57,10 @@ describe('PathResolver - Edge Cases', () => {
                 aliases: { '@app/*': ['/workspace/src/*'] }
             });
 
-            // Mock loadPathMappings to return controlled mappings
-            const mockDocument = {
-                uri: {
-                    fsPath: '/workspace/src/components/Button.ts',
-                    scheme: 'file',
-                    path: '/workspace/src/components/Button.ts'
-                }
-            } as unknown as TextDocument;
+            const filePath = '/workspace/src/components/Button.ts';
 
-            // We can't fully test convertToRelative without mocking workspace and fs,
-            // but we can test the matchesPattern logic
-            const result = await resolver.convertImportPath('@app/components/Header', mockDocument);
-            // Will be null because workspace mock returns no workspace folder
-            // This is expected - the real test is that it doesn't throw
+            const result = resolver.convertImportPathBatch('@app/components/Header', filePath, '/workspace');
+            // Will be null because /workspace/src/components/Header does not exist on disk
             expect(result).toBeNull();
         });
     });
@@ -103,13 +92,11 @@ describe('PathResolver - Edge Cases', () => {
     describe('convertImportPath - mode guards', () => {
         it('should return null for relative imports in relative mode (short-circuit)', async () => {
             const resolver = new PathResolver({ mode: 'relative' });
-            const mockDocument = {
-                uri: { fsPath: '/workspace/src/file.ts' }
-            } as unknown as TextDocument;
+            const filePath = '/workspace/src/file.ts';
 
-            expect(await resolver.convertImportPath('./utils', mockDocument)).toBeNull();
-            expect(await resolver.convertImportPath('../shared', mockDocument)).toBeNull();
-            expect(await resolver.convertImportPath('../../lib', mockDocument)).toBeNull();
+            expect(resolver.convertImportPathBatch('./utils', filePath, '/workspace')).toBeNull();
+            expect(resolver.convertImportPathBatch('../shared', filePath, '/workspace')).toBeNull();
+            expect(resolver.convertImportPathBatch('../../lib', filePath, '/workspace')).toBeNull();
         });
 
         it('should NOT short-circuit relative imports in absolute mode', async () => {
@@ -117,15 +104,13 @@ describe('PathResolver - Edge Cases', () => {
                 mode: 'absolute',
                 aliases: { '@app/*': ['/workspace/src/*'] }
             });
-            const mockDocument = {
-                uri: { fsPath: '/workspace/src/components/Button.ts' }
-            } as unknown as TextDocument;
+            const filePath = '/workspace/src/components/Button.ts';
 
             // In absolute mode, relative imports are converted to alias paths
-            // The mock workspace returns /workspace as root, so ./Header resolves
+            // With /workspace as root, ./Header resolves
             // relative to /workspace/src/components/ -> /workspace/src/components/Header
             // which matches @app/* -> /workspace/src/* with capture 'components/Header'
-            const result = await resolver.convertImportPath('./Header', mockDocument);
+            const result = resolver.convertImportPathBatch('./Header', filePath, '/workspace');
             expect(result).toBe('@app/components/Header');
         });
 
@@ -134,12 +119,10 @@ describe('PathResolver - Edge Cases', () => {
                 mode: 'relative',
                 aliases: { '@app/*': ['src/*'] }
             });
-            const mockDocument = {
-                uri: { fsPath: '/workspace/src/file.ts' }
-            } as unknown as TextDocument;
+            const filePath = '/workspace/src/file.ts';
 
             // 'react' is not relative, not @/~, and doesn't match '@app/*'
-            const result = await resolver.convertImportPath('react', mockDocument);
+            const result = resolver.convertImportPathBatch('react', filePath, '/workspace');
             expect(result).toBeNull();
         });
     });

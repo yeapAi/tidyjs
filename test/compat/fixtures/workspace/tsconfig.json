@@ -1,0 +1,19 @@
+{
+    // Comments and trailing commas are accepted, as in real projects
+    "compilerOptions": {
+        "strict": true,
+        "target": "es2022",
+        "module": "esnext",
+        "moduleResolution": "bundler",
+        "jsx": "preserve",
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "noEmit": true,
+        "types": ["node"],
+        "paths": {
+            "@app/*": ["./src/app/*"],
+            "@shared/*": ["./src/shared/*"],
+        },
+    },
+    "include": ["src/**/*.ts", "src/**/*.tsx"],
+}
