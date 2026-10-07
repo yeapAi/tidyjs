@@ -526,6 +526,22 @@ export function mergeFileConfigs(base: TidyJSConfigFile, override: TidyJSConfigF
     };
 }
 
+function withAliasesResolvedFrom(config: TidyJSConfigFile, directory: string): TidyJSConfigFile {
+    const aliases = config.pathResolution?.aliases;
+    if (!aliases) {
+        return config;
+    }
+    return {
+        ...config,
+        pathResolution: {
+            ...config.pathResolution,
+            aliases: Object.fromEntries(
+                Object.entries(aliases).map(([pattern, paths]) => [pattern, paths.map(p => path.resolve(directory, p))])
+            ),
+        },
+    };
+}
+
 export async function loadConfigFile(configPath: string): Promise<TidyJSConfigFile | null> {
     try {
         const content = await fs.promises.readFile(configPath, 'utf8');
@@ -537,7 +553,7 @@ export async function loadConfigFile(configPath: string): Promise<TidyJSConfigFi
             const baseConfigPath = path.resolve(path.dirname(configPath), config.extends);
             const baseConfig = await loadConfigFile(baseConfigPath);
             if (baseConfig) {
-                return mergeFileConfigs(baseConfig, config);
+                return mergeFileConfigs(withAliasesResolvedFrom(baseConfig, path.dirname(baseConfigPath)), config);
             }
         }
 

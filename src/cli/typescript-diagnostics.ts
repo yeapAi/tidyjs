@@ -227,11 +227,11 @@ interface NativeSnapshot {
 }
 
 interface NativeApi {
-    updateSnapshot(params: { openFiles: string[] }): NativeSnapshot;
+    updateSnapshot(params: { openFiles: string[]; closeFiles?: string[]; fileChanges?: { changed: string[] } }): NativeSnapshot;
     close(): void;
 }
 
-type NativeApiConstructor = new (options: { cwd?: string }) => NativeApi;
+type NativeApiConstructor = new (options: { cwd?: string; fs?: { readFile(fileName: string): string | undefined } }) => NativeApi;
 
 interface NativeRuntime {
     packageDir: string;
@@ -289,13 +289,21 @@ class NativeTypeScriptSession {
     constructor(
         private readonly api: NativeApi,
         private readonly runtime: NativeRuntime,
-        private readonly editorSettings: TypeScriptEditorSettings
+        private readonly editorSettings: TypeScriptEditorSettings,
+        private readonly overlay: Map<string, string>
     ) {}
 
-    open(files: string[]): NativeSnapshot {
+    open(files: string[], changed: string[] = []): NativeSnapshot {
+        const pinned = changed.filter((file) => this.opened.has(file));
+        if (pinned.length > 0) {
+            this.api.updateSnapshot({ openFiles: [], closeFiles: pinned }).dispose();
+            for (const file of pinned) {
+                this.opened.delete(file);
+            }
+        }
         const fresh = files.map(toTypeScriptFileName).filter((file) => !this.opened.has(file));
-        if (fresh.length > 0 || !this.snapshot) {
-            const next = this.api.updateSnapshot({ openFiles: fresh });
+        if (fresh.length > 0 || changed.length > 0 || !this.snapshot) {
+            const next = this.api.updateSnapshot(changed.length > 0 ? { openFiles: fresh, fileChanges: { changed } } : { openFiles: fresh });
             this.snapshot?.dispose();
             this.snapshot = next;
             for (const file of fresh) {
@@ -305,8 +313,8 @@ class NativeTypeScriptSession {
         return this.snapshot;
     }
 
-    private project(filePath: string): NativeProject {
-        const project = this.open([filePath]).getDefaultProjectForFile(toTypeScriptFileName(filePath));
+    private project(filePath: string, changed: string[] = []): NativeProject {
+        const project = this.open([filePath], changed).getDefaultProjectForFile(toTypeScriptFileName(filePath));
         if (!project) {
             throw new DiagnosticsUnavailableError('typescript', `TypeScript ${this.runtime.version} found no project for ${filePath}`);
         }
@@ -324,9 +332,11 @@ class NativeTypeScriptSession {
         };
     }
 
-    getDiagnostics(filePath: string): TidyDiagnostic[] {
+    getDiagnostics(filePath: string, text: string): TidyDiagnostic[] {
         const fileName = toTypeScriptFileName(filePath);
-        const program = this.project(filePath).program;
+        const seenText = this.overlay.get(fileName) ?? fs.readFileSync(filePath, 'utf8');
+        this.overlay.set(fileName, text);
+        const program = this.project(filePath, seenText === text ? [] : [fileName]).program;
         const diagnostics = [
             ...program.getSyntacticDiagnostics(fileName),
             ...program.getSemanticDiagnostics(fileName),
@@ -407,8 +417,12 @@ export class TypeScriptDiagnosticsProvider {
             session = (async () => {
                 const apiPath = createRequire(path.join(runtime.packageDir, 'package.json')).resolve('typescript/unstable/sync');
                 const module = await import(pathToFileURL(apiPath).href) as { API: NativeApiConstructor };
-                const api = new module.API({ cwd: workspaceRoot ?? path.dirname(filePath) });
-                const native = new NativeTypeScriptSession(api, runtime, this.editorSettings);
+                const overlay = new Map<string, string>();
+                const api = new module.API({
+                    cwd: workspaceRoot ?? path.dirname(filePath),
+                    fs: { readFile: (fileName) => overlay.get(toTypeScriptFileName(fileName)) },
+                });
+                const native = new NativeTypeScriptSession(api, runtime, this.editorSettings, overlay);
                 native.open(this.preparedFiles.length > 0 ? this.preparedFiles : [filePath]);
                 return native;
             })();
@@ -442,7 +456,7 @@ export class TypeScriptDiagnosticsProvider {
         }
 
         if (resolved.kind === 'native') {
-            return (await this.nativeSessionFor(resolved.runtime, workspaceRoot, filePath)).getDiagnostics(filePath);
+            return (await this.nativeSessionFor(resolved.runtime, workspaceRoot, filePath)).getDiagnostics(filePath, text);
         }
         return this.sessionFor(resolved.runtime).getDiagnostics(filePath, text, workspaceRoot);
     }

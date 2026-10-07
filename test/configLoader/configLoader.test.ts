@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { ConfigLoader } from '../../src/vscode/config-loader';
+import { configManager } from '../../src/vscode/config-manager';
 import { TidyJSConfigFile } from '../../src/types';
 
 // Mock vscode
@@ -182,6 +183,23 @@ describe('ConfigLoader', () => {
             fs.unlinkSync(configPath);
         });
 
+        it('should resolve inherited aliases against the directory of the config that declares them', async () => {
+            fs.mkdirSync(path.join(testDir, 'configs'), { recursive: true });
+            fs.mkdirSync(path.join(testDir, 'app'), { recursive: true });
+            const baseConfigPath = path.join(testDir, 'configs', 'base.json');
+            const configPath = path.join(testDir, 'app', 'tidyjs.json');
+            fs.writeFileSync(baseConfigPath, JSON.stringify({ pathResolution: { aliases: { '@base/*': ['./src/*'] } } }));
+            fs.writeFileSync(configPath, JSON.stringify({ extends: '../configs/base.json' }));
+
+            const fileConfig = await ConfigLoader.loadConfigFile(configPath);
+            const result = ConfigLoader.convertFileConfigToConfig(fileConfig!, configPath);
+
+            expect(result.pathResolution!.aliases!['@base/*']).toEqual([path.join(testDir, 'configs', 'src', '*')]);
+
+            fs.rmSync(path.join(testDir, 'configs'), { recursive: true, force: true });
+            fs.rmSync(path.join(testDir, 'app'), { recursive: true, force: true });
+        });
+
         it('should return null for invalid JSON', async () => {
             const configPath = path.join(testDir, 'tidyjs.json');
             
@@ -254,5 +272,25 @@ describe('ConfigLoader', () => {
             ]);
             expect(result.excludedFolders).toEqual(['build']);
         });
+    });
+});
+
+describe('ConfigLoader file watcher', () => {
+    it.each(['onDidCreate', 'onDidChange', 'onDidDelete'] as const)('%s clears the document cache', (event) => {
+        const handlers: Partial<Record<typeof event, () => void>> = {};
+        const watcher = {
+            onDidCreate: (handler: () => void) => { handlers.onDidCreate = handler; },
+            onDidChange: (handler: () => void) => { handlers.onDidChange = handler; },
+            onDidDelete: (handler: () => void) => { handlers.onDidDelete = handler; },
+            dispose: jest.fn(),
+        };
+        (vscode.workspace as unknown as { createFileSystemWatcher: () => typeof watcher }).createFileSystemWatcher = () => watcher;
+        const clearDocumentCache = jest.spyOn(configManager, 'clearDocumentCache').mockImplementation(() => undefined);
+
+        ConfigLoader.initialize({ subscriptions: [] } as unknown as vscode.ExtensionContext);
+        handlers[event]!();
+
+        expect(clearDocumentCache).toHaveBeenCalled();
+        clearDocumentCache.mockRestore();
     });
 });

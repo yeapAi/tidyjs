@@ -5,6 +5,7 @@ import * as path from 'path';
 
 const repoRoot = path.resolve(__dirname, '../..');
 const cliPath = path.join(repoRoot, 'dist/cli.js');
+const typescript7 = path.join(repoRoot, '.vscode-test/ts7/node_modules/typescript');
 
 const ESLINT_CONFIG = `import tseslint from 'typescript-eslint';
 export default [{
@@ -26,6 +27,7 @@ export default [{
 
 const TYPE_SOURCE = "import { Stats, statSync } from 'fs';\n\nexport const stat = (file: string): Stats => statSync(file);\n";
 const TYPE_FIXED = "// Other\nimport { statSync }   from 'fs';\nimport type { Stats } from 'fs';\n\nexport const stat = (file: string): Stats => statSync(file);\n";
+const TYPE_SOURCE_WITH_UNUSED = "import { Stats, statSync } from 'fs';\nimport { join } from 'path';\n\nexport const stat = (file: string): Stats => statSync(file);\n";
 const TYPE_FORMATTED_ONLY = "// Other\nimport {\n    Stats,\n    statSync\n}            from 'fs';\n\nexport const stat = (file: string): Stats => statSync(file);\n";
 
 const SOURCE = "import { join, resolve } from 'path';\nimport { readFileSync } from 'fs';\n\nexport const read = readFileSync;\n";
@@ -57,8 +59,8 @@ describe('ESLint diagnostics through the built CLI', () => {
         }
     }
 
-    function run(): { status: number | null; stdout: string; stderr: string; output: string } {
-        const result = spawnSync(process.execPath, [cliPath, '--write', '--verbose', '--root', root, 'src'], { cwd: root, encoding: 'utf8' });
+    function run(extraArgs: string[] = []): { status: number | null; stdout: string; stderr: string; output: string } {
+        const result = spawnSync(process.execPath, [cliPath, '--write', '--verbose', '--root', root, ...extraArgs, 'src'], { cwd: root, encoding: 'utf8' });
         return { status: result.status, stdout: result.stdout, stderr: result.stderr, output: fs.readFileSync(path.join(root, 'src/a.ts'), 'utf8') };
     }
 
@@ -129,6 +131,19 @@ describe('ESLint diagnostics through the built CLI', () => {
 
             expect(result.status).toBe(0);
             expect(result.stdout).toContain('eslint fixes: applied');
+            expect(result.output).toBe(TYPE_FIXED);
+        });
+
+        test.each([
+            ['fast import analysis', []],
+            ['full analysis', ['--no-fast-analysis']],
+            ...fs.existsSync(path.join(typescript7, 'package.json')) ? [['TypeScript 7 native API', ['--typescript', typescript7]]] : [],
+        ] as [string, string[]][])('unused imports are found in the text fixed by ESLint, not in the file on disk (%s)', (_label, extraArgs) => {
+            setup({ eslintConfig: FIX_CONFIG, settings: { 'editor.codeActionsOnSave': { 'source.fixAll.eslint': 'explicit' } } });
+            write('src/a.ts', TYPE_SOURCE_WITH_UNUSED);
+            const result = run(extraArgs);
+
+            expect(result.stdout).toContain('unused names: join');
             expect(result.output).toBe(TYPE_FIXED);
         });
 

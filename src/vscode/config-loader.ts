@@ -23,13 +23,14 @@ export class ConfigLoader {
         const pattern = `**/{${CONFIG_FILE_NAMES.join(',')}}`;
         this.fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
 
-        this.fileWatcher.onDidCreate(() => this.clearCache());
-        this.fileWatcher.onDidChange(() => {
+        const clearAllCaches = (): void => {
             debugLog('Config file changed, clearing all caches');
             this.clearCache();
             configManager.clearDocumentCache();
-        });
-        this.fileWatcher.onDidDelete(() => this.clearCache());
+        };
+        this.fileWatcher.onDidCreate(clearAllCaches);
+        this.fileWatcher.onDidChange(clearAllCaches);
+        this.fileWatcher.onDidDelete(clearAllCaches);
 
         context.subscriptions.push(this.fileWatcher);
 
