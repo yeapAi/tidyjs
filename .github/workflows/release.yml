@@ -1,56 +1,88 @@
-name: Create Release
+name: Release VSIX
 
 on:
+  pull_request:
+    types: [closed]
+    branches: [main]
   push:
     tags:
       - 'v*'
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Tag name for the release (e.g., v1.4.2)'
-        required: true
-        type: string
+      bump:
+        description: 'Version increment applied when the current version is already released'
+        type: choice
+        options: [patch, minor, major]
+        default: patch
 
 permissions:
   contents: write
-  packages: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  release:
+    if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
+    runs-on: macos-latest
+    env:
+      BRANCH: ${{ github.event.pull_request.base.ref || github.ref_name }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-        
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref }}
+
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
-          
-      - name: Install dependencies
-        run: npm install
-        
-      - name: Build and package extension
-        run: npm run build
-      
-      - name: Create tag (manual dispatch only)
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git tag ${{ github.event.inputs.tag }}
-          git push origin ${{ github.event.inputs.tag }}
-      
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
-          name: Release ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
-          files: |
-            *.vsix
-          draft: false
-          prerelease: false
-          generate_release_notes: true
+          node-version: '22'
+          cache: npm
+
+      - name: Resolve version
+        id: version
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BUMP: ${{ inputs.bump || 'patch' }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            tag="$GITHUB_REF_NAME"
+            if gh release view "$tag" > /dev/null 2>&1; then
+              echo "::notice::Release $tag already exists"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            tag="v$(node -p "require('./package.json').version")"
+            if gh release view "$tag" > /dev/null 2>&1; then
+              npm version "$BUMP" --no-git-tag-version
+              tag="v$(node -p "require('./package.json').version")"
+              git config user.name 'github-actions[bot]'
+              git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+              git commit -am "chore: bump version to ${tag#v}"
+              git push origin "HEAD:$BRANCH"
+              echo "::notice::Version bumped to ${tag#v} on $BRANCH"
+            fi
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        if: steps.version.outputs.skip != 'true'
+        run: npm ci
+
+      - name: Build and package extension
+        if: steps.version.outputs.skip != 'true'
+        run: npm run build
+
+      - name: Publish release
+        if: steps.version.outputs.skip != 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ steps.version.outputs.sha }}
+          name: Release ${{ steps.version.outputs.tag }}
+          files: tidyjs-*.vsix
+          fail_on_unmatched_files: true
+          generate_release_notes: true

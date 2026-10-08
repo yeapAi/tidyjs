@@ -35,6 +35,10 @@ if (!existsSync(vsix)) {
 
 console.log(`Built TidyJS v${pkg.version}: ${vsix}`);
 
+if (process.env.CI) {
+    process.exit(0);
+}
+
 execSync(`open -R "${vsix}"`, { cwd: root, stdio: 'inherit' });
 
 const driveFolder = process.env.DRIVE_FOLDER_URL;
