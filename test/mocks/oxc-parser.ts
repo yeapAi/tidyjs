@@ -68,3 +68,7 @@ function wrap(result: any) {
 export function parseSync(filename: string, sourceText: string, options?: any) {
     return wrap(nativeBinding.parseSync(filename, sourceText, options));
 }
+
+export function rawTransferSupported(): boolean {
+    return false;
+}

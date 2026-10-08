@@ -1,0 +1,6 @@
+{
+    "extends": "../../tidyjs.json",
+    "format": {
+        "sortTypeMembers": true
+    }
+}

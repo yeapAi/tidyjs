@@ -1,0 +1,5 @@
+{
+    "name": "tidyjs-compat-fixture",
+    "private": true,
+    "type": "module"
+}

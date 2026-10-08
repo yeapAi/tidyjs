@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach, jest } from '@jest/globals';
-import { ConfigLoader } from '../../src/utils/configLoader';
+import { ConfigLoader } from '../../src/vscode/config-loader';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';

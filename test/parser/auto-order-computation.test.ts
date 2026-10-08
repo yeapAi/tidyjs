@@ -1,4 +1,4 @@
-import { configManager } from '../../src/utils/config';
+import { computeAutoOrder } from '../../src/core/config';
 import * as logUtils from '../../src/utils/log';
 
 // Mock the log utils
@@ -16,9 +16,6 @@ describe('Auto Order Computation', () => {
   });
 
   describe('computeAutoOrder', () => {
-    // Access the private method for testing
-    const computeAutoOrder = (configManager as any).computeAutoOrder.bind(configManager);
-
     it('should handle groups with no order conflicts', () => {
       const groups = [
         { name: 'react', order: 1, default: false },

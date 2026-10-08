@@ -1,7 +1,6 @@
 import type { ParsedImport, ParserResult } from './parser';
 
-import { logDebug, logError } from './utils/log';
-import { showMessage } from './utils/misc';
+import { logDebug, logError, notifyError } from './utils/log';
 import { buildDocument } from './ir/builders';
 import { printDocument } from './ir/printer';
 
@@ -155,7 +154,7 @@ async function formatImports(sourceText: string, config: Config, parserResult?: 
         return { text: formattedText };
     } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        showMessage.error(`An error occurred while formatting imports: ${errorMessage}`);
+        notifyError(`An error occurred while formatting imports: ${errorMessage}`);
         logError(`An error occurred while formatting imports: ${errorMessage}`);
         throw new Error(errorMessage);
     }

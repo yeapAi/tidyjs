@@ -27,7 +27,7 @@ jest.mock('vscode', () => {
 });
 
 // Import AFTER mocks are installed
-import { configManager } from '../../src/utils/config';
+import { configManager } from '../../src/vscode/config-manager';
 
 const mockAccess = fs.promises.access as jest.MockedFunction<typeof fs.promises.access>;
 const mockReadFile = fs.promises.readFile as jest.MockedFunction<typeof fs.promises.readFile>;

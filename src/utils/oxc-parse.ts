@@ -1,5 +1,11 @@
-import { parseSync } from 'oxc-parser';
+import { parseSync, rawTransferSupported } from 'oxc-parser';
 import type { Program } from '../types/ast';
+
+let rawTransfer = false;
+
+export function enableRawTransfer(): void {
+    rawTransfer = rawTransferSupported();
+}
 
 export function parseSource(
     sourceText: string,
@@ -14,6 +20,7 @@ export function parseSource(
         sourceType: 'module',
         lang,
         range: true,
+        ...({ experimentalRawTransfer: rawTransfer } as object),
     });
 
     if (result.errors.length > 0) {

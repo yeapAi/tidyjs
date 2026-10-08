@@ -1,32 +1,28 @@
 // Other
-import { sortCodePatterns, sortPropertiesInSelection } from './destructuring-sorter';
-import { formatImports } from './formatter';
-import { organizeReExports } from './reexport-organizer';
+import { sortPropertiesInSelection } from './destructuring-sorter';
 import { formatFolder } from './batch-formatter';
-import { ImportParser, ParserResult, InvalidImport, ParsedImport, ImportSource } from './parser';
+import { formatSource, isFileInExcludedFolder, ParserCache } from './core/pipeline';
+import { InvalidImport } from './parser';
 
 // VSCode
 import { Range, window, commands, TextEdit, workspace, languages, CancellationTokenSource, ProgressLocation, Uri } from 'vscode';
 import type { TextDocument, ExtensionContext, FormattingOptions, CancellationToken, DocumentFormattingEditProvider } from 'vscode';
+import { configManager } from './vscode/config-manager';
+import { diagnosticsCache, getPublishedDiagnostics } from './vscode/diagnostics';
+import { createVSCodeLogSink } from './vscode/log-sink';
+import { showMessage } from './vscode/messages';
 
 // Utils
-import { configManager } from './utils/config';
 import { createDocumentSnapshot, FormattingRetryScheduler, hasDocumentChanged } from './utils/format-concurrency';
-import { diagnosticsCache } from './utils/diagnostics-cache';
-import { validateFormattedOutput } from './utils/format-validation';
-import { hasIgnorePragma } from './utils/ignore-pragma';
-import { logDebug, logError } from './utils/log';
-import { showMessage, analyzeImports } from './utils/misc';
+import { logDebug, logError, setLogSink } from './utils/log';
 import { perfMonitor } from './utils/performance';
-import { PathResolver } from './utils/path-resolver';
 import { getMinimalTextReplacement } from './utils/text-edit';
 
 // Node
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 
-let parser: ImportParser | null = null;
-let lastConfigString = '';
+const parsers = new ParserCache(new Map(), 1);
 const retryScheduler = new FormattingRetryScheduler((documentKey) => {
     const activeEditor = window.activeTextEditor;
 
@@ -64,9 +60,8 @@ class TidyJSFormattingProvider implements DocumentFormattingEditProvider {
         try {
             const snapshot = createDocumentSnapshot(document);
 
-            // Get document-specific configuration
             const currentConfig = await configManager.getConfigForDocument(document);
-            
+
             logDebug(`Document config loaded for ${document.fileName}:`, {
                 debug: currentConfig.debug,
                 groups: currentConfig.groups?.length || 0,
@@ -74,250 +69,28 @@ class TidyJSFormattingProvider implements DocumentFormattingEditProvider {
                 singleQuote: currentConfig.format?.singleQuote,
                 indent: currentConfig.format?.indent
             });
-            
-            // Vérifier si le document est dans un dossier exclu
-            if (isDocumentInExcludedFolder(document, currentConfig)) {
+
+            const workspaceRoot = workspace.getWorkspaceFolder(document.uri)?.uri.fsPath;
+
+            if (isFileInExcludedFolder(document.uri.fsPath, currentConfig, workspaceRoot)) {
                 logDebug('Formatting skipped: document is in excluded folder');
                 return undefined;
             }
 
             const documentText = document.getText();
 
-            // Check for tidyjs-ignore pragma
-            if (hasIgnorePragma(documentText)) {
-                logDebug('Formatting skipped: tidyjs-ignore pragma found');
-                return undefined;
-            }
-
-            // Create or update parser with document-specific configuration
-            const configString = JSON.stringify(currentConfig);
-            const configChanged = configString !== lastConfigString;
-
-            if (!parser || configChanged) {
-                try {
-                    // Dispose of old parser to clean up cache
-                    if (parser) {
-                        logDebug('Disposing old parser instance for document-specific config');
-                        parser.dispose();
-                    }
-
-                    logDebug(configChanged ? 'Document config differs, creating new parser' : 'Creating new parser instance');
-                    parser = new ImportParser(currentConfig);
-                    lastConfigString = configString;
-                } catch (error) {
-                    logError('Error initializing parser with document config:', error);
-                    return undefined;
-                }
-            }
-
             perfMonitor.clear();
             perfMonitor.start('total_format_operation');
 
-            // Prepare filtering parameters for parser
-            let missingModules: Set<string> | undefined;
-            let unusedImportsList: string[] | undefined;
-            
-            logDebug('Current configuration:', {
-                removeUnusedImports: currentConfig.format?.removeUnusedImports,
-                removeMissingModules: currentConfig.format?.removeMissingModules,
-                formatDefined: currentConfig.format !== undefined,
+            const outcome = await formatSource({
+                text: documentText,
+                filePath: document.fileName,
+                config: currentConfig,
+                workspaceRoot,
+                parsers,
+                profile: 'editor',
+                getDiagnostics: async () => getPublishedDiagnostics(document),
             });
-            
-            if (currentConfig.format?.removeUnusedImports === true || currentConfig.format?.removeMissingModules === true) {
-                try {
-
-                    const diagnostics = perfMonitor.measureSync('get_diagnostics', () => diagnosticsCache.getDiagnostics(document.uri), {
-                        uri: document.uri.toString(),
-                    });
-
-                    // Parse once to get initial import info for filtering
-                    const initialParserResult = perfMonitor.measureSync('initial_parser_parse', () => parser!.parse(documentText, undefined, undefined, document.fileName) as ParserResult, {
-                        documentLength: documentText.length,
-                    });
-
-                    // Single analysis call that gets everything we need
-                    const analysis = perfMonitor.measureSync(
-                        'analyze_imports',
-                        () => analyzeImports(document.uri, initialParserResult, diagnostics),
-                        {
-                            removeUnused: currentConfig.format?.removeUnusedImports,
-                            removeMissing: currentConfig.format?.removeMissingModules,
-                        }
-                    );
-
-                    // Prepare filtering parameters based on configuration
-                    if (currentConfig.format?.removeUnusedImports === true) {
-                        unusedImportsList = analysis.unusedImports;
-                    }
-                    
-                    if (currentConfig.format?.removeMissingModules === true) {
-                        missingModules = analysis.missingModules;
-                        
-                        // If removeUnusedImports is NOT enabled, still remove unused imports from missing modules
-                        if (currentConfig.format?.removeUnusedImports !== true) {
-                            unusedImportsList = Array.from(analysis.unusedFromMissing);
-                        }
-                    }
-
-                    logDebug('Filtering parameters prepared:', {
-                        config: {
-                            removeUnusedImports: currentConfig.format?.removeUnusedImports,
-                            removeMissingModules: currentConfig.format?.removeMissingModules,
-                        },
-                        filtering: {
-                            unusedImportsList: unusedImportsList || [],
-                            missingModules: missingModules ? Array.from(missingModules) : [],
-                        },
-                    });
-                } catch (error) {
-                    logError('Error preparing import filters:', error instanceof Error ? error.message : String(error));
-                }
-            } else {
-                logDebug('Skipping import analysis - both removeUnusedImports and removeMissingModules are false');
-            }
-            
-            // Final safety check - ensure we don't pass filtering parameters when options are disabled
-            if (currentConfig.format?.removeMissingModules !== true) {
-                missingModules = undefined;
-            }
-            if (currentConfig.format?.removeUnusedImports !== true && currentConfig.format?.removeMissingModules !== true) {
-                unusedImportsList = undefined;
-            }
-            
-            logDebug('Final filtering parameters:', {
-                missingModulesSet: missingModules !== undefined,
-                unusedImportsCount: unusedImportsList?.length || 0,
-            });
-
-            // Parse document with filtering - parser now handles all filtering logic
-            let parserResult = perfMonitor.measureSync(
-                'parser_parse',
-                () => parser!.parse(documentText, missingModules, unusedImportsList, document.fileName) as ParserResult,
-                { documentLength: documentText.length }
-            );
-
-            // Check if parser returned any processable imports
-            const hasPostProcessing =
-                currentConfig.format?.sortEnumMembers ||
-                currentConfig.format?.sortExports ||
-                currentConfig.format?.sortClassProperties ||
-                currentConfig.format?.sortTypeMembers ||
-                currentConfig.format?.organizeReExports;
-
-            if (!parserResult.importRange && parserResult.groups.length === 0) {
-                if (!hasPostProcessing) {
-                    logDebug('No imports to process in document');
-                    return undefined;
-                }
-
-                // No imports but post-processing features are enabled — run them on the raw text
-                logDebug('No imports to process, but post-processing features are enabled');
-                let finalText = documentText;
-
-                if (currentConfig.format?.sortEnumMembers ||
-                    currentConfig.format?.sortExports ||
-                    currentConfig.format?.sortClassProperties ||
-                    currentConfig.format?.sortTypeMembers) {
-                    finalText = sortCodePatterns(finalText, currentConfig);
-                }
-                if (currentConfig.format?.organizeReExports) {
-                    finalText = organizeReExports(finalText, currentConfig);
-                }
-
-                if (finalText === documentText) {
-                    logDebug('Post-processing produced no changes');
-                    return undefined;
-                }
-
-                const validationError = validateFormattedOutput(parser!, finalText, document.fileName);
-                if (validationError) {
-                    logError('Post-format validation failed:', validationError);
-                    showMessage.error(`TidyJS formatting aborted: ${validationError}`);
-                    return undefined;
-                }
-
-                if (hasDocumentChanged(document, snapshot)) {
-                    const scheduled = retryScheduler.schedule(snapshot.uri);
-                    logDebug(`Formatting skipped due to concurrent document change (${snapshot.uri}). Retry scheduled: ${scheduled}`);
-                    return undefined;
-                }
-
-                const edits = createDocumentEdits(document, documentText, finalText);
-                const totalDuration = perfMonitor.end('total_format_operation');
-                logDebug(`Document formatting (post-processing only) completed in ${totalDuration.toFixed(2)}ms`);
-                return edits;
-            }
-            
-            // Apply path resolution if enabled
-            if (currentConfig.pathResolution?.mode) {
-                try {
-                    const pathResolver = new PathResolver({
-                        mode: currentConfig.pathResolution.mode,
-                        preferredAliases: currentConfig.pathResolution.preferredAliases || [],
-                        aliases: currentConfig.pathResolution.aliases,
-                    });
-
-                    const resolutionMode = currentConfig.pathResolution.mode;
-                    logDebug('Applying path resolution with mode:', resolutionMode);
-
-                    const enhancedParserResult = await applyPathResolutionWithRegrouping(
-                        parserResult,
-                        pathResolver,
-                        document,
-                        parser!,
-                        resolutionMode
-                    );
-
-                    if (enhancedParserResult) {
-                        parserResult = enhancedParserResult;
-                    }
-                } catch (error) {
-                    logError('Error during path resolution:', error);
-                    // Continue without path resolution on error
-                }
-            }
-
-            // Vérifier les imports invalides
-            if (parserResult.invalidImports && parserResult.invalidImports.length > 0) {
-                const errorMessages = parserResult.invalidImports.map((invalidImport) => {
-                    return formatImportError(invalidImport);
-                });
-                logError('Invalid imports found:', errorMessages.join('\n'));
-                return undefined;
-            }
-
-            // Debug: Log the imports before formatting
-            if (currentConfig.pathResolution?.mode) {
-                logDebug('Imports before formatting:');
-                parserResult.groups.forEach(group => {
-                    group.imports.forEach(imp => {
-                        logDebug(`  ${group.name}: ${imp.source}`);
-                    });
-                });
-            }
-            
-            // Formater les imports
-            const formattedDocument = await perfMonitor.measureAsync('format_imports', () =>
-                formatImports(documentText, currentConfig, parserResult)
-            );
-
-            if (formattedDocument.error) {
-                logError('Formatting error:', formattedDocument.error);
-                return undefined;
-            }
-
-            // Post-processing: sort code patterns if any sorting feature is enabled
-            let finalText = formattedDocument.text;
-            if (currentConfig.format?.sortEnumMembers ||
-                currentConfig.format?.sortExports ||
-                currentConfig.format?.sortClassProperties) {
-                finalText = sortCodePatterns(finalText, currentConfig);
-            }
-
-            // Post-processing: organize re-exports if enabled
-            if (currentConfig.format?.organizeReExports) {
-                finalText = organizeReExports(finalText, currentConfig);
-            }
 
             const totalDuration = perfMonitor.end('total_format_operation');
             logDebug(`Document formatting completed in ${totalDuration.toFixed(2)}ms`);
@@ -326,10 +99,26 @@ class TidyJSFormattingProvider implements DocumentFormattingEditProvider {
                 perfMonitor.logSummary();
             }
 
-            const validationError = validateFormattedOutput(parser!, finalText, document.fileName);
-            if (validationError) {
-                logError('Post-format validation failed:', validationError);
-                showMessage.error(`TidyJS formatting aborted: ${validationError}`);
+            if (outcome.status === 'unchanged') {
+                return undefined;
+            }
+
+            if (outcome.status === 'failed') {
+                switch (outcome.stage) {
+                    case 'parser-init':
+                        logError('Error initializing parser with document config:', outcome.message);
+                        break;
+                    case 'invalid-imports':
+                        logError('Invalid imports found:', (outcome.invalidImports ?? []).map(formatImportError).join('\n'));
+                        break;
+                    case 'format':
+                        logError('Formatting error:', outcome.message);
+                        break;
+                    case 'validation':
+                        logError('Post-format validation failed:', outcome.message);
+                        showMessage.error(`TidyJS formatting aborted: ${outcome.message}`);
+                        break;
+                }
                 return undefined;
             }
 
@@ -339,7 +128,7 @@ class TidyJSFormattingProvider implements DocumentFormattingEditProvider {
                 return undefined;
             }
 
-            return createDocumentEdits(document, documentText, finalText);
+            return createDocumentEdits(document, documentText, outcome.text);
         } catch (error) {
             logError('Error in provideDocumentFormattingEdits:', error);
             return undefined;
@@ -347,33 +136,6 @@ class TidyJSFormattingProvider implements DocumentFormattingEditProvider {
             diagnosticsCache.clear();
         }
     }
-}
-
-/**
- * Check if the current document is in an excluded folder
- */
-function isDocumentInExcludedFolder(document: import('vscode').TextDocument, config?: import('./types').Config): boolean {
-    const currentConfig = config || configManager.getConfig();
-    const excludedFolders = currentConfig.excludedFolders;
-
-    if (!excludedFolders || excludedFolders.length === 0) {
-        return false;
-    }
-
-    const workspaceFolder = workspace.getWorkspaceFolder(document.uri);
-
-    if (!workspaceFolder) {
-        return false;
-    }
-
-    const relativePath = workspace.asRelativePath(document.uri, false);
-
-    return excludedFolders.some((excludedFolder) => {
-        const normalizedExcludedPath = excludedFolder.replace(/[/\\]/g, '/');
-        const normalizedDocumentPath = relativePath.replace(/[/\\]/g, '/');
-
-        return normalizedDocumentPath.startsWith(normalizedExcludedPath + '/') || normalizedDocumentPath === normalizedExcludedPath;
-    });
 }
 
 /**
@@ -395,27 +157,12 @@ async function ensureExtensionEnabled(document?: import('vscode').TextDocument):
         return false;
     }
 
-    // Check if configuration has changed
-    const configString = JSON.stringify(config);
-    const configChanged = configString !== lastConfigString;
-
-    // Create or recreate parser if needed
-    if (!parser || configChanged) {
-        try {
-            // Dispose of old parser to clean up cache
-            if (parser) {
-                logDebug('Disposing old parser instance');
-                parser.dispose();
-            }
-
-            logDebug(configChanged ? 'Configuration changed, recreating parser' : 'Creating new parser instance');
-            parser = new ImportParser(config);
-            lastConfigString = configString;
-        } catch (error) {
-            logError('Error initializing parser:', error);
-            showMessage.error(`Error initializing parser: ${error}`);
-            return false;
-        }
+    try {
+        parsers.get(config);
+    } catch (error) {
+        logError('Error initializing parser:', error);
+        showMessage.error(`Error initializing parser: ${error}`);
+        return false;
     }
 
     return true;
@@ -423,6 +170,8 @@ async function ensureExtensionEnabled(document?: import('vscode').TextDocument):
 
 export function activate(context: ExtensionContext): void {
     try {
+        setLogSink(createVSCodeLogSink());
+
         // Initialize ConfigManager with context
         configManager.initialize(context);
         
@@ -430,9 +179,7 @@ export function activate(context: ExtensionContext): void {
         const validation = configManager.validateCurrentConfiguration();
 
         if (validation.isValid) {
-            const config = configManager.getParserConfig();
-            parser = new ImportParser(config);
-            lastConfigString = JSON.stringify(config);
+            parsers.get(configManager.getParserConfig());
         } else {
             showMessage.error(
                 `TidyJS extension disabled due to configuration errors:\n${validation.errors.join(
@@ -440,7 +187,7 @@ export function activate(context: ExtensionContext): void {
                 )}\n\nPlease fix your configuration to use the extension.`
             );
             logError('Extension started with invalid configuration - commands disabled:', validation.errors);
-            parser = null;
+            parsers.clear();
         }
 
         // Enregistrer TidyJS comme formatting provider pour TypeScript et JavaScript
@@ -585,6 +332,8 @@ export function activate(context: ExtensionContext): void {
             const workspaceFolder = workspace.getWorkspaceFolder(folderUri);
             const workspaceRoot = workspaceFolder?.uri.fsPath;
 
+            configManager.clearDocumentCache();
+
             await window.withProgress(
                 {
                     location: ProgressLocation.Notification,
@@ -603,7 +352,8 @@ export function activate(context: ExtensionContext): void {
                             logDebug(`Batch format progress: ${pct}% — ${filePath}`);
                         },
                         isCancelled: () => token.isCancellationRequested,
-                        createUri: (filePath) => Uri.file(filePath),
+                        resolveConfig: (filePath) => configManager.getConfigForUri(Uri.file(filePath)),
+                        fallbackConfig: () => configManager.getConfig(),
                     });
 
                     if (token.isCancellationRequested) {
@@ -638,8 +388,7 @@ export function activate(context: ExtensionContext): void {
         const configChangeDisposable = workspace.onDidChangeConfiguration((e) => {
             if (e.affectsConfiguration('tidyjs')) {
                 logDebug('TidyJS configuration changed, parser will be recreated on next use');
-                // Force parser recreation on next use by clearing the config string
-                lastConfigString = '';
+                parsers.clear();
                 // Clear document config cache
                 configManager.clearDocumentCache();
             }
@@ -686,94 +435,13 @@ function formatImportError(invalidImport: InvalidImport): string {
     return formattedError;
 }
 
-/**
- * Apply path resolution and re-group imports based on converted paths.
- * In absolute mode: re-determine group from the new alias path.
- * In relative mode: keep the original group (the relative path won't match the regex pattern).
- */
-async function applyPathResolutionWithRegrouping(
-    originalResult: ParserResult,
-    pathResolver: PathResolver,
-    document: TextDocument,
-    parserInstance: ImportParser,
-    mode: 'absolute' | 'relative'
-): Promise<ParserResult | null> {
-    try {
-        const allImports: ParsedImport[] = [];
-        for (const group of originalResult.groups) {
-            allImports.push(...group.imports);
-        }
-
-        const convertedImports: ParsedImport[] = [];
-        let hasChanges = false;
-        let convertedCount = 0;
-
-        for (const importInfo of allImports) {
-            const resolvedPath = await pathResolver.convertImportPath(
-                importInfo.source,
-                document
-            );
-
-            if (resolvedPath && resolvedPath !== importInfo.source) {
-                let groupName = importInfo.groupName;
-                let isPriority = importInfo.isPriority;
-
-                // Only re-group in absolute mode — the new alias path may match a different group.
-                // In relative mode, keep the original group since relative paths won't match regex patterns.
-                if (mode === 'absolute') {
-                    const result = parserInstance.determineGroup(resolvedPath);
-                    groupName = result.groupName;
-                    isPriority = result.isPriority;
-                }
-
-                const convertedImport = {
-                    ...importInfo,
-                    source: resolvedPath as ImportSource,
-                    groupName,
-                    isPriority
-                };
-                convertedImports.push(convertedImport);
-                hasChanges = true;
-                convertedCount++;
-                logDebug(`Path resolved: ${importInfo.source} -> ${resolvedPath} (group: ${groupName})`);
-            } else {
-                convertedImports.push(importInfo);
-            }
-        }
-
-        if (!hasChanges) {
-            logDebug('Path resolution: no changes needed');
-            return null;
-        }
-
-        logDebug(`Path resolution summary: ${convertedCount}/${allImports.length} imports converted`);
-
-        const regroupedGroups = parserInstance.organizeImportsIntoGroups(convertedImports);
-
-        return {
-            ...originalResult,
-            groups: regroupedGroups
-        };
-    } catch (error) {
-        logError('Error applying path resolution with regrouping:', error);
-        return null;
-    }
-}
-
 export function deactivate(): void {
     try {
         logDebug('Extension deactivating - cleaning up resources');
 
-        // Dispose of parser to clean up cache
-        if (parser) {
-            parser.dispose();
-            parser = null;
-        }
+        parsers.clear();
 
         retryScheduler.dispose();
-
-        // Clear configuration cache
-        lastConfigString = '';
 
         logDebug('Extension deactivated successfully');
     } catch (error) {

@@ -1,4 +1,4 @@
-import { ConfigLoader } from '../../src/utils/configLoader';
+import { ConfigLoader } from '../../src/vscode/config-loader';
 import { logError, logDebug } from '../../src/utils/log';
 
 jest.mock('../../src/utils/log');

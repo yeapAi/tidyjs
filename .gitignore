@@ -17,6 +17,8 @@ plans/
 docs/plans/
 test/.vscode
 test/**/*.js
+!test/compat/fixtures/**/*.js
+!test/compat/expected/**/*.js
 ignore
 
 # Compiled JavaScript files in src (should only have TypeScript)
@@ -25,6 +27,7 @@ src/**/*.js.map
 
 # Test files
 test/**/package.json
+!test/compat/fixtures/**/package.json
 test/**/package-*.json
 
 # Worktrees
@@ -34,5 +37,4 @@ test/**/package-*.json
 .env
 
 # Package manager files
-package-lock.json
 pnpm-lock.yaml

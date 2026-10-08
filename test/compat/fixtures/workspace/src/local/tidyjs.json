@@ -1,0 +1,13 @@
+{
+    "extends": "../../tidyjs.json",
+    "groups": [
+        { "name": "Node", "match": "^(node:|fs$|path$|os$)", "order": 0, "sortOrder": ["path", "node:*", "fs", "os"] },
+        { "name": "Packages", "match": "^[^@.]", "order": 1, "sortOrder": "alphabetic" },
+        { "name": "Other", "default": true }
+    ],
+    "format": {
+        "indent": 2,
+        "sortSpecifiers": "alpha",
+        "trailingComma": "always"
+    }
+}

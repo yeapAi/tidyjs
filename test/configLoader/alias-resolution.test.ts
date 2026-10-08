@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { ConfigLoader } from '../../src/utils/configLoader';
+import { ConfigLoader } from '../../src/vscode/config-loader';
 import { TidyJSConfigFile } from '../../src/types';
 
 jest.mock('vscode');

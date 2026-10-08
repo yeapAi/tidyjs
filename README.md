@@ -40,6 +40,17 @@ TidyJS automatically organizes, groups, and aligns import declarations with AST-
 
 `.ts`, `.tsx`, `.js`, `.jsx`
 
+### Command Line
+
+The same engine runs outside VS Code, with the TypeScript and ESLint diagnostics computed by the CLI itself:
+
+```bash
+node ~/.vscode/extensions/asmir.tidyjs-<version>/dist/cli.js --check .    # exit 1 when a file would change
+node ~/.vscode/extensions/asmir.tidyjs-<version>/dist/cli.js --write .    # apply the changes
+```
+
+The CLI ships inside the extension and is not published on npm. In Yeap-UI-Apps, `yarn commit` runs it on the staged files. See [CLI](./docs/cli.md) for options, exit codes and the Yeap-UI-Apps integration.
+
 ## Quick Start
 
 Create a `.tidyjsrc` in your project root:
@@ -112,10 +123,12 @@ import * as Utils from './utils';
 - [Re-export Organization](./docs/reexport-organizer.md) — Grouping, sorting, and alignment of re-exports
 - [Ignore Pragma](./docs/ignore-pragma.md) — Exclude files from formatting
 - [Batch Formatting](./docs/batch-formatting.md) — Format all files in a folder
+- [CLI](./docs/cli.md) — Run TidyJS from a terminal or from `yarn commit` in Yeap-UI-Apps
 
 ### Internal Pipeline
 
 - [IR Pipeline](./docs/ir-pipeline.md) — Formatting engine architecture
+- [CLI Architecture](./docs/cli-architecture.md) — Core and adapters, and the differences between the editor and the CLI
 
 ### Help
 

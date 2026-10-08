@@ -6,8 +6,10 @@ export default {
         "**/parser/**/*.ts",
         "**/configLoader/**/*.ts",
         "**/path-resolver/**/*.ts",
-        "**/test/ir/**/*.ts"
+        "**/test/ir/**/*.ts",
+        "**/test/compat/**/*.test.ts"
     ],
+    globalSetup: "<rootDir>/test/compat/global-setup.cjs",
     moduleNameMapper: {
         "^vscode$": "<rootDir>/test/mocks/vscode.ts",
         "^oxc-parser$": "<rootDir>/test/mocks/oxc-parser.ts"
@@ -18,7 +20,9 @@ export default {
     moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
     testPathIgnorePatterns: [
         "/node_modules/",
-        "/.vscode-test/"
+        "/.vscode-test/",
+        "/test/compat/fixtures/",
+        "/test/compat/expected/"
     ],
     modulePathIgnorePatterns: [
         "/.vscode-test/"
