@@ -118,9 +118,6 @@ const oxcRequirePlugin = {
 };
 
 /**
- * CLI configuration — ESM for Node.
- * oxc-parser is bundled like in the extension, its native binding is copied to dist/.
- * typescript and eslint are resolved from the formatted project at runtime.
  * @type {import('esbuild').BuildOptions}
  */
 const cliConfig = {

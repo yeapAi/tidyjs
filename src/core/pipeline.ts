@@ -62,18 +62,13 @@ export class ParserCache {
 
         const parser = new ImportParser(config);
         while (this.entries.size >= this.maxEntries) {
-            const oldestKey = this.entries.keys().next().value as string;
-            this.entries.get(oldestKey)?.dispose();
-            this.entries.delete(oldestKey);
+            this.entries.delete(this.entries.keys().next().value as string);
         }
         this.entries.set(key, parser);
         return parser;
     }
 
     clear(): void {
-        for (const parser of this.entries.values()) {
-            parser.dispose();
-        }
         this.entries.clear();
     }
 }

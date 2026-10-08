@@ -187,4 +187,15 @@ describe('ParserCache', () => {
         expect(entries.size).toBe(1);
         cache.clear();
     });
+
+    test('keeps the groups of a parser still in use after its eviction or a clear', () => {
+        const cache = new ParserCache(new Map(), 1);
+        const parser = cache.get({ ...baseConfig, groups: [{ name: 'React', order: 0, match: /^react$/ }, { name: 'Other', order: 1, default: true }] });
+
+        cache.get({ ...baseConfig, format: { indent: 2 } });
+        expect(parser.determineGroup('react').groupName).toBe('React');
+
+        cache.clear();
+        expect(parser.determineGroup('react').groupName).toBe('React');
+    });
 });

@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 
 import { createSettingsReader, getSettingsSection } from '../core/settings';
@@ -206,7 +207,7 @@ export async function runCli(argv: string[], environment: CliEnvironment): Promi
             reporter.error(error instanceof Error ? error.message : String(error));
             return EXIT_ERROR;
         }
-        files = files.filter((file) => selected.has(file));
+        files = files.filter((file) => selected.has(fs.realpathSync(file)));
     }
 
     const sessionOptions: SessionOptions = {

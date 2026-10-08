@@ -8,7 +8,6 @@ import { InvalidImport } from './parser';
 import { Range, window, commands, TextEdit, workspace, languages, CancellationTokenSource, ProgressLocation, Uri } from 'vscode';
 import type { TextDocument, ExtensionContext, FormattingOptions, CancellationToken, DocumentFormattingEditProvider } from 'vscode';
 import { configManager } from './vscode/config-manager';
-import { ConfigLoader } from './vscode/config-loader';
 import { diagnosticsCache, getPublishedDiagnostics } from './vscode/diagnostics';
 import { createVSCodeLogSink } from './vscode/log-sink';
 import { showMessage } from './vscode/messages';
@@ -333,7 +332,6 @@ export function activate(context: ExtensionContext): void {
             const workspaceFolder = workspace.getWorkspaceFolder(folderUri);
             const workspaceRoot = workspaceFolder?.uri.fsPath;
 
-            ConfigLoader.clearCache();
             configManager.clearDocumentCache();
 
             await window.withProgress(

@@ -69,6 +69,24 @@ describe('tsconfig reading for path resolution', () => {
         expect(readTsConfigPathOptions(configPath)).toEqual({ baseUrl: path.join(root, 'node_modules/shared-config') });
     });
 
+    test('follows the tsconfig field of a package named in extends', () => {
+        write(root, 'node_modules/@scope/conf/package.json', '{ "name": "@scope/conf", "main": "index.js", "tsconfig": "./configs/base.json" }');
+        write(root, 'node_modules/@scope/conf/index.js', 'module.exports = {};');
+        write(root, 'node_modules/@scope/conf/configs/base.json', '{ "compilerOptions": { "paths": { "@lib/*": ["./lib/*"] } } }');
+        const configPath = write(root, 'tsconfig.json', '{ "extends": "@scope/conf" }');
+
+        expect(readTsConfigPathOptions(configPath)?.pathsBasePath).toBe(path.join(root, 'node_modules/@scope/conf/configs'));
+    });
+
+    test('uses the tsconfig.json of a package named in extends instead of its JavaScript main', () => {
+        write(root, 'node_modules/plain-config/package.json', '{ "name": "plain-config", "main": "index.js" }');
+        write(root, 'node_modules/plain-config/index.js', 'module.exports = {};');
+        write(root, 'node_modules/plain-config/tsconfig.json', '{ "compilerOptions": { "paths": { "@lib/*": ["./lib/*"] } } }');
+        const configPath = write(root, 'tsconfig.json', '{ "extends": "plain-config" }');
+
+        expect(readTsConfigPathOptions(configPath)?.paths).toEqual({ '@lib/*': ['./lib/*'] });
+    });
+
     test('lets the extending file override inherited paths and survives extends cycles', () => {
         write(root, 'a.json', '{ "extends": "./tsconfig.json", "compilerOptions": { "paths": { "@a/*": ["a/*"] } } }');
         const configPath = write(root, 'tsconfig.json', '{ "extends": "./a.json", "compilerOptions": { "paths": { "@b/*": ["b/*"] } } }');

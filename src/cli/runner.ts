@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as path from 'path';
 
 import { resolveConfigForFile, validateConfiguration } from '../core/config';
 import { formatSource, isFileInExcludedFolder, ParserCache } from '../core/pipeline';
@@ -40,8 +41,11 @@ export interface RunnerOptions {
 
 const BOM = '﻿';
 
+type DirectoryConfig = { configPath: string | undefined } & ({ config: Config } | { error: unknown });
+
 export class FileRunner {
     private readonly parsers = new ParserCache();
+    private readonly directoryConfigs = new Map<string, Promise<DirectoryConfig>>();
 
     constructor(
         private readonly workspace: CliWorkspace,
@@ -58,14 +62,32 @@ export class FileRunner {
         if (this.options.profile !== 'editor' || !this.diagnostics) {
             return false;
         }
-        try {
-            const workspaceRoot = this.workspace.rootFor(filePath);
-            const config = await resolveConfigForFile(filePath, this.workspace.resolutionContext(filePath));
-            return config.format?.removeUnusedImports === true
-                && validateConfiguration(config).isValid
-                && !isFileInExcludedFolder(filePath, config, workspaceRoot);
-        } catch {
+        const resolved = await this.configFor(filePath);
+        if ('error' in resolved) {
             return false;
+        }
+        return resolved.config.format?.removeUnusedImports === true
+            && validateConfiguration(resolved.config).isValid
+            && !isFileInExcludedFolder(filePath, resolved.config, this.workspace.rootFor(filePath));
+    }
+
+    private configFor(filePath: string): Promise<DirectoryConfig> {
+        const directory = path.dirname(filePath);
+        let resolved = this.directoryConfigs.get(directory);
+        if (!resolved) {
+            resolved = this.resolveDirectoryConfig(filePath);
+            this.directoryConfigs.set(directory, resolved);
+        }
+        return resolved;
+    }
+
+    private async resolveDirectoryConfig(filePath: string): Promise<DirectoryConfig> {
+        let configPath: string | undefined;
+        try {
+            configPath = (await this.workspace.fileSources.getSource(filePath, this.workspace.rootFor(filePath)))?.path;
+            return { configPath, config: await resolveConfigForFile(filePath, this.workspace.resolutionContext(filePath)) };
+        } catch (error) {
+            return { configPath, error };
         }
     }
 
@@ -81,13 +103,12 @@ export class FileRunner {
         };
         const workspaceRoot = this.workspace.rootFor(filePath);
 
-        let config: Config;
-        try {
-            report.configPath = (await this.workspace.fileSources.getSource(filePath, workspaceRoot))?.path;
-            config = await resolveConfigForFile(filePath, this.workspace.resolutionContext(filePath));
-        } catch (error) {
-            return this.fail(report, 'config', `Invalid configuration: ${error instanceof Error ? error.message : String(error)}`);
+        const resolved = await this.configFor(filePath);
+        report.configPath = resolved.configPath;
+        if ('error' in resolved) {
+            return this.fail(report, 'config', `Invalid configuration: ${resolved.error instanceof Error ? resolved.error.message : String(resolved.error)}`);
         }
+        const config = resolved.config;
 
         const validation = validateConfiguration(config);
         if (!validation.isValid) {

@@ -25,7 +25,6 @@ export class ConfigLoader {
 
         const clearAllCaches = (): void => {
             debugLog('Config file changed, clearing all caches');
-            this.clearCache();
             configManager.clearDocumentCache();
         };
         this.fileWatcher.onDidCreate(clearAllCaches);

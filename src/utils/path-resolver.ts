@@ -91,16 +91,45 @@ export function extractTsConfigPaths(configPath: string, config: unknown): PathM
     return mappingsFromPathOptions(ownPathOptions(configPath, config));
 }
 
+function existingConfigFile(candidate: string): string | undefined {
+    return [candidate, `${candidate}.json`].find(file => fs.existsSync(file) && fs.statSync(file).isFile());
+}
+
+function packageTsconfigField(packageName: string, localRequire: NodeJS.Require): string | undefined {
+    for (const directory of localRequire.resolve.paths(packageName) ?? []) {
+        const packageDir = nodePath.join(directory, packageName);
+        let manifest: { exports?: unknown; tsconfig?: unknown };
+        try {
+            manifest = JSON.parse(fs.readFileSync(nodePath.join(packageDir, 'package.json'), 'utf-8'));
+        } catch {
+            continue;
+        }
+        if (manifest.exports !== undefined || typeof manifest.tsconfig !== 'string') {
+            return undefined;
+        }
+        return existingConfigFile(nodePath.resolve(packageDir, manifest.tsconfig));
+    }
+    return undefined;
+}
+
 function resolveExtendedConfig(specifier: string, fromDir: string): string | undefined {
     if (specifier.startsWith('.') || nodePath.isAbsolute(specifier)) {
-        const candidate = nodePath.resolve(fromDir, specifier);
-        return [candidate, `${candidate}.json`].find(file => fs.existsSync(file) && fs.statSync(file).isFile());
+        return existingConfigFile(nodePath.resolve(fromDir, specifier));
     }
 
     const localRequire = createRequire(nodePath.join(fromDir, 'tsconfig.json'));
+    if (/^(?:@[^/]+\/)?[^/]+$/.test(specifier)) {
+        const fromField = packageTsconfigField(specifier, localRequire);
+        if (fromField) {
+            return fromField;
+        }
+    }
     for (const request of [specifier, `${specifier}.json`, `${specifier}/tsconfig.json`]) {
         try {
-            return localRequire.resolve(request);
+            const resolved = localRequire.resolve(request);
+            if (resolved.endsWith('.json')) {
+                return resolved;
+            }
         } catch {
             continue;
         }

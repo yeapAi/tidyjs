@@ -163,6 +163,15 @@ describe('runCli', () => {
 
         await run(['--staged', '.']);
         expect(stdout).toBe('would format  staged.ts\n');
+
+        const link = `${root}-link`;
+        fs.symlinkSync(root, link, 'dir');
+        try {
+            expect(await run(['--staged', link])).toBe(0);
+            expect(stderr).toContain('1 file(s): 1 to format');
+        } finally {
+            fs.unlinkSync(link);
+        }
     });
 
     test('--typescript uses the given TypeScript package', async () => {

@@ -51,12 +51,19 @@ export async function runInWorkers<Options>(
                 child.disconnect();
             }
         });
-        child.on('exit', () => {
+        const finish = (): void => {
             if (!done) {
                 child.removeAllListeners('message');
             }
             resolve();
+        };
+        child.on('exit', finish);
+        child.on('error', () => {
+            child.kill();
+            finish();
         });
-        child.send({ options, files: chunk.map((entry) => entry.file) } satisfies WorkerTask<Options>);
+        if (child.connected) {
+            child.send({ options, files: chunk.map((entry) => entry.file) } satisfies WorkerTask<Options>);
+        }
     })));
 }

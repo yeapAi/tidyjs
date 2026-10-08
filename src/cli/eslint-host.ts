@@ -31,61 +31,79 @@ type HostRequest =
     | { type: 'fixAll'; id: number; filePath: string; text: string; workspaceRoot: string | undefined }
     | { type: 'lintFile'; id: number; filePath: string; workspaceRoot: string | undefined };
 
+type QueuedRequest = Exclude<HostRequest, { type: 'init' }>;
+
 type HostResponse =
     | { id: number; result: EslintLintResult | EslintFixResult; digest?: string }
     | { id: number; error: { message: string; unavailable: boolean }; digest?: string };
 
 export function runEslintHost(): void {
     let provider: EslintDiagnosticsProvider | undefined;
-    let queue: Promise<void> = Promise.resolve();
+    const requests: QueuedRequest[] = [];
+    const prefetches: QueuedRequest[] = [];
+    let draining = false;
+
+    const handle = async (message: QueuedRequest): Promise<void> => {
+        if (!provider) {
+            return;
+        }
+        if (message.type === 'warm') {
+            await provider.warm(message.filePath, message.workspaceRoot);
+            return;
+        }
+        let text: string;
+        let digest: string | undefined;
+        if (message.type === 'lintFile') {
+            try {
+                const raw = await fs.promises.readFile(message.filePath, 'utf8');
+                text = raw.startsWith(BOM) ? raw.slice(1) : raw;
+            } catch {
+                process.send?.({ id: message.id, error: { message: 'unreadable', unavailable: false }, digest: '' } satisfies HostResponse);
+                return;
+            }
+            digest = textDigest(text);
+        } else {
+            text = message.text;
+        }
+        let response: HostResponse;
+        try {
+            const result = message.type === 'fixAll'
+                ? await provider.fixAll(message.filePath, text, message.workspaceRoot)
+                : await provider.lint(message.filePath, text, message.workspaceRoot);
+            response = { id: message.id, result, digest };
+        } catch (error) {
+            response = {
+                id: message.id,
+                error: {
+                    message: error instanceof Error ? error.message : String(error),
+                    unavailable: error instanceof DiagnosticsUnavailableError,
+                },
+                digest,
+            };
+        }
+        process.send?.(response);
+    };
+
+    const drain = async (): Promise<void> => {
+        draining = true;
+        for (let message = requests.shift() ?? prefetches.shift(); message; message = requests.shift() ?? prefetches.shift()) {
+            await handle(message);
+        }
+        draining = false;
+    };
 
     process.on('message', (message: HostRequest) => {
         if (message.type === 'init') {
             provider = new EslintDiagnosticsProvider(message.settings);
             return;
         }
-        queue = queue.then(async () => {
-            if (!provider) {
-                return;
-            }
-            if (message.type === 'warm') {
-                await provider.warm(message.filePath, message.workspaceRoot);
-                return;
-            }
-            let text: string;
-            let digest: string | undefined;
-            if (message.type === 'lintFile') {
-                try {
-                    const raw = await fs.promises.readFile(message.filePath, 'utf8');
-                    text = raw.startsWith(BOM) ? raw.slice(1) : raw;
-                } catch {
-                    process.send?.({ id: message.id, error: { message: 'unreadable', unavailable: false }, digest: '' } satisfies HostResponse);
-                    return;
-                }
-                digest = textDigest(text);
-            } else {
-                text = message.text;
-            }
-            let response: HostResponse;
-            try {
-                const result = message.type === 'fixAll'
-                    ? await provider.fixAll(message.filePath, text, message.workspaceRoot)
-                    : await provider.lint(message.filePath, text, message.workspaceRoot);
-                response = { id: message.id, result, digest };
-            } catch (error) {
-                response = {
-                    id: message.id,
-                    error: {
-                        message: error instanceof Error ? error.message : String(error),
-                        unavailable: error instanceof DiagnosticsUnavailableError,
-                    },
-                    digest,
-                };
-            }
-            process.send?.(response);
-        });
+        (message.type === 'lintFile' ? prefetches : requests).push(message);
+        if (!draining) {
+            void drain();
+        }
     });
     process.on('disconnect', () => process.exit(0));
+    process.on('error', () => process.exit(0));
 }
 
 export class RemoteEslintLinter implements EslintLinter {
@@ -112,19 +130,30 @@ export class RemoteEslintLinter implements EslintLinter {
                 waiter.reject(new Error(response.error.message));
             }
         });
-        this.child.on('exit', (code, signal) => {
-            this.exitError = new DiagnosticsUnavailableError('eslint', `ESLint process stopped (${signal ?? code})`);
-            for (const waiter of this.pending.values()) {
-                waiter.reject(this.exitError);
-            }
-            this.pending.clear();
-        });
-        this.child.send({ type: 'init', settings } satisfies HostRequest);
+        this.child.on('exit', (code, signal) => this.stop(`ESLint process stopped (${signal ?? code})`));
+        this.child.on('error', (error) => this.stop(`ESLint process failed (${error.message})`));
+        this.send({ type: 'init', settings });
+    }
+
+    private send(message: HostRequest): void {
+        if (this.child.connected) {
+            this.child.send(message);
+        } else {
+            this.stop('ESLint process is not connected');
+        }
+    }
+
+    private stop(reason: string): void {
+        this.exitError ??= new DiagnosticsUnavailableError('eslint', reason);
+        for (const waiter of this.pending.values()) {
+            waiter.reject(this.exitError);
+        }
+        this.pending.clear();
     }
 
     warm(filePath: string, workspaceRoot: string | undefined): void {
         if (!this.exitError) {
-            this.child.send({ type: 'warm', filePath, workspaceRoot } satisfies HostRequest);
+            this.send({ type: 'warm', filePath, workspaceRoot });
         }
     }
 
@@ -141,7 +170,7 @@ export class RemoteEslintLinter implements EslintLinter {
                     resolve: (result: EslintLintResult) => settle({ digest, outcome: { ok: true, result } }),
                     reject: (error) => settle({ digest, outcome: { ok: false, error } }),
                 });
-                this.child.send({ type: 'lintFile', id, filePath, workspaceRoot } satisfies HostRequest);
+                this.send({ type: 'lintFile', id, filePath, workspaceRoot });
             }));
         }
     }
@@ -172,7 +201,7 @@ export class RemoteEslintLinter implements EslintLinter {
         const id = this.nextId++;
         return new Promise((resolve, reject) => {
             this.pending.set(id, { resolve, reject });
-            this.child.send({ ...message, id } satisfies HostRequest);
+            this.send({ ...message, id });
         });
     }
 

@@ -1,11 +1,7 @@
 import * as vscode from 'vscode';
 
 import {
-    cloneConfig,
-    computeAutoOrder,
     loadSettingsConfiguration,
-    mergeConfigs,
-    parseRegexString,
     resolveConfigForFile,
     sortGroupsForParser,
     validateConfiguration,
@@ -36,14 +32,6 @@ class ConfigManager {
         logDebug('ConfigManager initialized');
     }
 
-    private deepCloneConfig(config: Config): Config {
-        return cloneConfig(config);
-    }
-
-    private computeAutoOrder(groups: Config['groups']): Config['groups'] {
-        return computeAutoOrder(groups);
-    }
-
     public validateConfiguration(config: Config): ConfigValidation {
         return validateConfiguration(config);
     }
@@ -66,10 +54,6 @@ class ConfigManager {
 
     public getGroups(): Config['groups'] {
         return sortGroupsForParser(this.getConfig().groups);
-    }
-
-    private parseRegexString(regexStr: string): RegExp | undefined {
-        return parseRegexString(regexStr);
     }
 
     private loadConfiguration(): Config {
@@ -104,10 +88,6 @@ class ConfigManager {
 
     public async getConfigForDocument(document: vscode.TextDocument): Promise<Config> {
         return this.getConfigForUri(document.uri);
-    }
-
-    private mergeConfigs(base: Config, override: Partial<Config>): Config {
-        return mergeConfigs(base, override);
     }
 
     public clearDocumentCache(): void {
