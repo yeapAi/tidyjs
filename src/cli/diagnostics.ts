@@ -6,6 +6,7 @@ import type { TidyDiagnostic } from '../core/diagnostics';
 import type { DiagnosticsSource } from './diagnostic-errors';
 import type { EslintDiagnosticsProvider, EslintFixResult, EslintLintResult } from './eslint-diagnostics';
 import type { EslintLinter } from './eslint-host';
+import type { Linter, LinterLintResult, LinterName } from './linter';
 import type { TypeScriptDiagnosticsProvider } from './typescript-diagnostics';
 
 export type SourceStatus = 'used' | 'skipped' | 'unavailable' | 'failed';
@@ -16,6 +17,7 @@ export interface SourceReport {
     count: number;
     detail?: string;
     location?: string;
+    warnings?: string[];
 }
 
 export interface CollectedDiagnostics {
@@ -32,6 +34,8 @@ export interface CollectRequest {
 }
 
 export class LocalEslintLinter implements EslintLinter {
+    readonly name = 'eslint';
+
     constructor(private readonly provider: EslintDiagnosticsProvider) {}
 
     lint(filePath: string, text: string, workspaceRoot: string | undefined): Promise<EslintLintResult> {
@@ -62,6 +66,7 @@ function settle<T>(promise: Promise<T>): Promise<Settled<T>> {
 }
 
 export class LazyEslintLinter implements EslintLinter {
+    readonly name = 'eslint';
     private linter: EslintLinter | undefined;
 
     constructor(private readonly create: () => EslintLinter) {}
@@ -92,12 +97,26 @@ export class LazyEslintLinter implements EslintLinter {
     }
 }
 
+interface LintRun {
+    linter: Linter;
+    outcome: Promise<Settled<LinterLintResult>>;
+}
+
 export class CliDiagnostics {
     constructor(
         private readonly typescript: TypeScriptDiagnosticsProvider | undefined,
-        private readonly eslint: EslintLinter | undefined,
+        private readonly linters: readonly Linter[],
         private readonly fastAnalysis = false
     ) {}
+
+    private startLint(request: CollectRequest): LintRun[] {
+        const { filePath, text, workspaceRoot } = request;
+        return this.linters.map((linter) => ({ linter, outcome: settle(linter.lint(filePath, text, workspaceRoot)) }));
+    }
+
+    private skipped(detail: string): SourceReport[] {
+        return this.linters.map((linter) => ({ source: linter.name, status: 'skipped', count: 0, detail }));
+    }
 
     async collect(request: CollectRequest): Promise<CollectedDiagnostics> {
         const { filePath, text, workspaceRoot } = request;
@@ -105,25 +124,24 @@ export class CliDiagnostics {
         const reports: SourceReport[] = [];
         let fastAnalysisNote: string | undefined;
 
-        if (this.fastAnalysis && this.typescript && this.eslint) {
+        if (this.fastAnalysis && this.typescript && this.linters.length > 0) {
             const verdict = this.typescript.fastAnalysis(filePath, text, workspaceRoot);
             if (verdict.decided) {
                 return {
                     diagnostics: verdict.diagnostics,
                     reports: [
                         { source: 'typescript', status: 'used', count: verdict.diagnostics.length, detail: 'fast import analysis' },
-                        { source: 'eslint', status: 'skipped', count: 0, detail: 'not needed: fast import analysis decided' },
+                        ...this.skipped('not needed: fast import analysis decided'),
                     ],
                 };
             }
             if (verdict.stage === 'file') {
-                return this.collectFileOnly(request, this.typescript, this.eslint, verdict.reason);
+                return this.collectFileOnly(request, this.typescript, verdict.reason);
             }
             fastAnalysisNote = `full analysis because ${verdict.reason}`;
         }
 
-        const eslintNeededUpfront = request.removeUnusedImports;
-        let eslintRun = this.eslint && eslintNeededUpfront ? settle(this.eslint.lint(filePath, text, workspaceRoot)) : undefined;
+        let lintRuns = request.removeUnusedImports ? this.startLint(request) : undefined;
 
         let typescriptDiagnostics: TidyDiagnostic[] = [];
         if (!this.typescript) {
@@ -148,43 +166,39 @@ export class CliDiagnostics {
             }
         }
 
-        if (!this.eslint) {
-            reports.push({ source: 'eslint', status: 'skipped', count: 0, detail: 'disabled by --no-eslint' });
+        if (this.linters.length === 0) {
             return { diagnostics, reports };
         }
 
-        if (!eslintRun) {
+        if (!lintRuns) {
             const typescriptRan = reports.some((report) => report.source === 'typescript' && report.status === 'used');
             const missingModules = analyzeImportDiagnostics(request.initialResult, typescriptDiagnostics).missingModules;
             if (typescriptRan && missingModules.size === 0) {
-                reports.push({ source: 'eslint', status: 'skipped', count: 0, detail: 'not needed: no missing module to clean up' });
+                reports.push(...this.skipped('not needed: no missing module to clean up'));
                 return { diagnostics, reports };
             }
-            eslintRun = settle(this.eslint.lint(filePath, text, workspaceRoot));
+            lintRuns = this.startLint(request);
         }
 
-        reports.push(eslintReport(await eslintRun, diagnostics));
+        for (const run of lintRuns) {
+            reports.push(lintReport(run.linter.name, await run.outcome, diagnostics));
+        }
         return { diagnostics, reports };
     }
 
-    private async collectFileOnly(
-        request: CollectRequest,
-        typescript: TypeScriptDiagnosticsProvider,
-        eslint: EslintLinter,
-        reason: string
-    ): Promise<CollectedDiagnostics> {
+    private async collectFileOnly(request: CollectRequest, typescript: TypeScriptDiagnosticsProvider, reason: string): Promise<CollectedDiagnostics> {
         const { filePath, text, workspaceRoot } = request;
         if (!request.removeUnusedImports) {
             return {
                 diagnostics: [],
                 reports: [
                     { source: 'typescript', status: 'used', count: 0, detail: `fast import analysis: every module resolves (${reason})` },
-                    { source: 'eslint', status: 'skipped', count: 0, detail: 'not needed: no missing module to clean up' },
+                    ...this.skipped('not needed: no missing module to clean up'),
                 ],
             };
         }
 
-        const eslintRun = settle(eslint.lint(filePath, text, workspaceRoot));
+        const lintRuns = this.startLint(request);
         const diagnostics: TidyDiagnostic[] = [];
         const reports: SourceReport[] = [];
         try {
@@ -194,23 +208,26 @@ export class CliDiagnostics {
         } catch (error) {
             reports.push(describeFailure('typescript', error));
         }
-        reports.push(eslintReport(await eslintRun, diagnostics));
+        for (const run of lintRuns) {
+            reports.push(lintReport(run.linter.name, await run.outcome, diagnostics));
+        }
         return { diagnostics, reports };
     }
 }
 
-function eslintReport(outcome: Settled<EslintLintResult>, diagnostics: TidyDiagnostic[]): SourceReport {
+function lintReport(source: LinterName, outcome: Settled<LinterLintResult>, diagnostics: TidyDiagnostic[]): SourceReport {
     if (!outcome.ok) {
-        return describeFailure('eslint', outcome.error);
+        return describeFailure(source, outcome.error);
     }
     const result = outcome.value;
     diagnostics.push(...result.diagnostics);
     return {
-        source: 'eslint',
+        source,
         status: result.status === 'linted' ? 'used' : result.status === 'not-installed' || result.status === 'not-configured' ? 'unavailable' : 'skipped',
         count: result.diagnostics.length,
         detail: result.status,
         location: result.workingDirectory,
+        warnings: result.warnings,
     };
 }
 

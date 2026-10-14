@@ -7,10 +7,12 @@ import { EslintDiagnosticsProvider } from './eslint-diagnostics';
 
 import type { ChildProcess } from 'child_process';
 import type { EslintEditorSettings, EslintFixResult, EslintLintResult } from './eslint-diagnostics';
+import type { Linter } from './linter';
 
 export const ESLINT_HOST_FLAG = '--tidyjs-internal-eslint-host';
 
-export interface EslintLinter {
+export interface EslintLinter extends Linter {
+    readonly name: 'eslint';
     lint(filePath: string, text: string, workspaceRoot: string | undefined): Promise<EslintLintResult>;
     fixAll(filePath: string, text: string, workspaceRoot: string | undefined): Promise<EslintFixResult>;
     warm(filePath: string, workspaceRoot: string | undefined): void;
@@ -107,6 +109,7 @@ export function runEslintHost(): void {
 }
 
 export class RemoteEslintLinter implements EslintLinter {
+    readonly name = 'eslint';
     private readonly child: ChildProcess;
     private readonly pending = new Map<number, { resolve: (result: never) => void; reject: (error: Error) => void; digest?: (digest: string | undefined) => void }>();
     private readonly prefetched = new Map<string, Promise<{ digest: string | undefined; outcome: { ok: true; result: EslintLintResult } | { ok: false; error: Error } }>>();

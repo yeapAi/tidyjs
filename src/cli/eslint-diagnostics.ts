@@ -4,6 +4,7 @@ import { createRequire } from 'module';
 
 import { UNUSED_IMPORT_CODES } from '../core/diagnostics';
 import { DiagnosticsUnavailableError } from './diagnostic-errors';
+import { languageIdFor } from './workspace';
 
 import type { SettingsReader } from '../core/config';
 import type { TidyDiagnostic, TidyDiagnosticSeverity } from '../core/diagnostics';
@@ -115,22 +116,6 @@ type EslintConstructor = new (options: Record<string, unknown>) => EslintInstanc
 interface EslintModule {
     loadESLint?: (options: { useFlatConfig?: boolean; cwd?: string }) => Promise<EslintConstructor>;
     ESLint?: EslintConstructor;
-}
-
-export function languageIdFor(filePath: string): string {
-    const extension = path.extname(filePath).toLowerCase();
-    switch (extension) {
-        case '.ts':
-        case '.mts':
-        case '.cts':
-            return 'typescript';
-        case '.tsx':
-            return 'typescriptreact';
-        case '.jsx':
-            return 'javascriptreact';
-        default:
-            return 'javascript';
-    }
 }
 
 function asBoolean(value: unknown): boolean | undefined {

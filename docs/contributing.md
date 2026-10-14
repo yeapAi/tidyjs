@@ -20,15 +20,15 @@ The project uses **ESM output** (`"type": "module"` in package.json). The build 
 | `npm run dev` | Development mode with file watching |
 | `npm run test` | Run Jest unit tests |
 | `npm run test:e2e` | Run end-to-end VS Code tests |
-| `npm run lint` | Lint codebase with ESLint |
+| `npm run lint` | Lint codebase with oxlint (`.oxlintrc.json`) |
 | `npm run check` | Full validation (type check + lint + test) |
 | `npm run build` | Build production extension |
 
 ## TypeScript Toolchain
 
-`tsc` is TypeScript 7, the native compiler, installed under the alias `@typescript/native`. The `typescript` package is an alias of `@typescript/typescript6`, because TypeScript 7 no longer exposes the JavaScript compiler API that `ts-jest`, `typescript-eslint` and the classic analysis path of the CLI load by that name.
+`tsc` is TypeScript 7, the native compiler, installed under the alias `@typescript/native`. The `typescript` package is an alias of `@typescript/typescript6`, because TypeScript 7 no longer exposes the JavaScript compiler API that `ts-jest`, `typescript-eslint` (used by the ESLint compatibility tests) and the classic analysis path of the CLI load by that name.
 
-The compatibility suites (`npm run test:compat`) run the CLI against both, so the native path is always exercised. Do not bump `typescript` to 7: `typescript-eslint` and `ts-jest` would fail on load.
+The compatibility suites (`npm run test:compat`) run the CLI against both, so the native path is always exercised. Do not bump `typescript` to 7: `ts-jest` and `typescript-eslint` would fail on load.
 
 ## Project Architecture
 

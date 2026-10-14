@@ -44,7 +44,7 @@ exports.run = async function run() {
     const files = JSON.parse(process.env.TIDYJS_COMPAT_FILES);
     const warmup = process.env.TIDYJS_COMPAT_WARMUP;
 
-    for (const id of ['dbaeumer.vscode-eslint', 'Asmir.tidyjs']) {
+    for (const id of ['oxc.oxc-vscode', 'Asmir.tidyjs']) {
         const extension = vscode.extensions.getExtension(id);
         if (!extension) {
             throw new Error(`Extension ${id} is not available in the recording instance`);
@@ -54,7 +54,7 @@ exports.run = async function run() {
 
     const warmupUri = vscode.Uri.file(path.join(root, warmup));
     await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(warmupUri));
-    await waitForSettledDiagnostics(warmupUri, { timeout: 120000, minimum: 0, stableFor: 3000, requireSources: ['ts', 'eslint'] });
+    await waitForSettledDiagnostics(warmupUri, { timeout: 120000, minimum: 0, stableFor: 3000, requireSources: ['ts', 'oxc'] });
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');
 
     const report = { vscodeVersion: vscode.version, files: [] };

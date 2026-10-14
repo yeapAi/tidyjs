@@ -14,6 +14,7 @@ export interface CliArguments {
     root?: string;
     profile: FormatProfile;
     typescript: boolean;
+    oxlint: boolean;
     eslint: boolean;
     verbose: boolean;
     quiet: boolean;
@@ -41,9 +42,10 @@ Context:
       --profile <name>   "editor" (format on save, default) or "folder"
                          (Format Folder command: no diagnostics)
       --no-typescript    Do not compute TypeScript diagnostics
+      --no-oxlint        Do not run oxlint
       --no-eslint        Do not run ESLint
-      --no-diagnostics   Same as --no-typescript --no-eslint
-      --no-fast-analysis Always run the TypeScript checker and ESLint instead of
+      --no-diagnostics   Same as --no-typescript --no-oxlint --no-eslint
+      --no-fast-analysis Always run the TypeScript checker and the linters instead of
                          deciding unused and missing imports from syntax first
       --typescript <dir> Use this TypeScript package instead of the project's
                          (TypeScript 7 runs through its native API)
@@ -76,6 +78,7 @@ export function parseCliArguments(argv: string[]): CliArguments {
                 root: { type: 'string' },
                 profile: { type: 'string' },
                 'no-typescript': { type: 'boolean' },
+                'no-oxlint': { type: 'boolean' },
                 'no-eslint': { type: 'boolean' },
                 'no-diagnostics': { type: 'boolean' },
                 'no-fast-analysis': { type: 'boolean' },
@@ -138,6 +141,7 @@ export function parseCliArguments(argv: string[]): CliArguments {
         root: values.root,
         profile,
         typescript: !values['no-typescript'] && !values['no-diagnostics'],
+        oxlint: !values['no-oxlint'] && !values['no-diagnostics'],
         eslint: !values['no-eslint'] && !values['no-diagnostics'],
         verbose: values.verbose === true,
         quiet: values.quiet === true,

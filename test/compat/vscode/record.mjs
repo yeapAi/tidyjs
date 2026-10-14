@@ -22,22 +22,22 @@ function listFixtureFiles(directory, base = directory) {
         if (entry.isDirectory()) {
             return entry.name === 'node_modules' ? [] : listFixtureFiles(fullPath, base);
         }
-        return SUPPORTED.has(path.extname(entry.name)) && !entry.name.endsWith('.config.mjs')
+        return SUPPORTED.has(path.extname(entry.name))
             ? [path.relative(base, fullPath).split(path.sep).join('/')]
             : [];
     }).sort();
 }
 
-function findEslintExtension() {
-    if (process.env.TIDYJS_ESLINT_EXTENSION) {
-        return process.env.TIDYJS_ESLINT_EXTENSION;
+function findOxcExtension() {
+    if (process.env.TIDYJS_OXC_EXTENSION) {
+        return process.env.TIDYJS_OXC_EXTENSION;
     }
     const userExtensions = path.join(os.homedir(), '.vscode', 'extensions');
     const candidates = fs.existsSync(userExtensions)
-        ? fs.readdirSync(userExtensions).filter((name) => name.startsWith('dbaeumer.vscode-eslint-')).sort()
+        ? fs.readdirSync(userExtensions).filter((name) => name.startsWith('oxc.oxc-vscode-')).sort()
         : [];
     if (candidates.length === 0) {
-        throw new Error('ESLint extension not found. Install dbaeumer.vscode-eslint or set TIDYJS_ESLINT_EXTENSION.');
+        throw new Error('oxc extension not found. Install oxc.oxc-vscode or set TIDYJS_OXC_EXTENSION.');
     }
     return path.join(userExtensions, candidates[candidates.length - 1]);
 }
@@ -49,9 +49,9 @@ function prepare() {
         fs.symlinkSync(path.join(repoRoot, 'node_modules'), path.join(workspaceCopy, 'node_modules'), 'dir');
     }
 
-    const eslintExtension = findEslintExtension();
+    const oxcExtension = findOxcExtension();
     fs.mkdirSync(extensionsDir, { recursive: true });
-    fs.cpSync(eslintExtension, path.join(extensionsDir, path.basename(eslintExtension)), { recursive: true });
+    fs.cpSync(oxcExtension, path.join(extensionsDir, path.basename(oxcExtension)), { recursive: true });
 
     const tsdk = path.join(workspaceCopy, 'node_modules', 'typescript', 'lib');
     fs.mkdirSync(path.join(userDataDir, 'User'), { recursive: true });

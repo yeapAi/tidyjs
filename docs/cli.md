@@ -1,15 +1,15 @@
 # Command-Line Interface
 
-`tidyjs` runs the TidyJS engine from a terminal. This fork serves Yeap-UI-Apps, where it runs in the `yarn commit` step on the developer's machine, never in CI. It uses the same parser, IR printer, configuration resolution and guards as the VS Code extension, and computes the TypeScript and ESLint diagnostics that the extension reads from the editor. For a given project, it produces the result of a save in VS Code once the TypeScript server and ESLint have finished their analysis.
+`tidyjs` runs the TidyJS engine from a terminal. This fork serves Yeap-UI-Apps, where it runs in the `yarn commit` step on the developer's machine, never in CI. It uses the same parser, IR printer, configuration resolution and guards as the VS Code extension, and computes the TypeScript and linter diagnostics that the extension reads from the editor. For a given project, it produces the result of a save in VS Code once the TypeScript server and the linters have finished their analysis.
 
 How the two runtimes relate, and where they can differ, is described in [cli-architecture.md](cli-architecture.md).
 
 ## Requirements
 
-- Node.js 20 or later.
+- Node.js 20.19 or later, or 22.12 or later.
 - The `oxc-parser` native binding for the current platform. The build copies the binding installed on the build machine into `dist/`, as for the extension, so a `.vsix` built on Apple Silicon only runs there.
 - TypeScript, used only when `removeUnusedImports` or `removeMissingModules` is enabled. The project's own `typescript` package is used, so the diagnostics come from the version the project builds with. Without it, a warning is printed and nothing is removed; in a checkout of this repository, its own `typescript` is the fallback.
-- ESLint, optional. It is always loaded from the project, never from TidyJS, because the project's configuration and plugins live there.
+- oxlint and ESLint, both optional. Each one is always taken from the project, never from TidyJS, because the project's configuration lives there. oxlint is `node_modules/oxlint`, searched from the workspace root, then from the folder of the file, or `oxc.path.oxlint`; the CLI runs its language server, `oxlint --lsp`, which is what the oxc extension runs. ESLint is loaded through its Node API.
 
 ## Installation
 
@@ -49,14 +49,15 @@ tidyjs --write --staged         # pre-commit: staged files only
 | `--profile editor` | Default. Reproduces format on save, including diagnostics-based removal. |
 | `--profile folder` | Reproduces the **TidyJS: Format Folder** command: no diagnostics, and `sortTypeMembers` applied even in files with imports. |
 | `--no-typescript` | Do not compute TypeScript diagnostics. |
+| `--no-oxlint` | Do not run oxlint. |
 | `--no-eslint` | Do not run ESLint. |
-| `--no-diagnostics` | Both of the above. |
-| `--no-fast-analysis` | Always run the TypeScript checker and ESLint, instead of deciding unused and missing imports from the syntax first. The result is the same; only the time differs. |
+| `--no-diagnostics` | All three of the above. |
+| `--no-fast-analysis` | Always run the TypeScript checker and the linters, instead of deciding unused and missing imports from the syntax first. The result is the same; only the time differs. |
 | `--typescript <dir>` | Use this TypeScript package instead of the project's. A TypeScript 7 package runs through its native API. |
 | `--changed` | Only process files changed since `HEAD`, plus untracked files. |
 | `--staged` | Only process staged files. |
 | `-j`, `--jobs <n>` | Number of worker processes. Default: 1, or 2 from 800 files when diagnostics are computed. |
-| `-v`, `--verbose` | Also report unchanged and skipped files, the config file, the TypeScript project and version, the ESLint working directory, and the names removed. |
+| `-v`, `--verbose` | Also report unchanged and skipped files, the config file, the TypeScript project and version, the working directory of each linter, and the names removed. |
 | `-q`, `--quiet` | Only report errors. |
 | `--debug` | Print the TidyJS debug log to stderr, as the `tidyjs.debug` setting does in the output channel. |
 
@@ -86,32 +87,41 @@ A configuration that the **Format Imports** command would refuse (no default gro
 
 ## Diagnostics
 
-The diagnostics are computed only for files whose configuration enables `removeUnusedImports` or `removeMissingModules`, as in the editor. They feed the same analysis: missing modules from TypeScript errors `2307`/`2318`, unused names from TypeScript `6133`/`6196` and from the ESLint rule `@typescript-eslint/no-unused-vars`.
+The diagnostics are computed only for files whose configuration enables `removeUnusedImports` or `removeMissingModules`, as in the editor. They feed the same analysis: missing modules from TypeScript errors `2307`/`2318`, unused names from TypeScript `6133`/`6196` and from the linters: `eslint(no-unused-vars)` for oxlint, `@typescript-eslint/no-unused-vars` for ESLint.
 
 **TypeScript.** The CLI finds the project the way the TypeScript server does: the nearest `tsconfig.json` or `jsconfig.json` that includes the file, then its project references, then ancestor configurations, and otherwise an inferred project with the options VS Code gives to loose files. It reads syntactic, semantic and suggestion diagnostics, like the editor. The settings `typescript.validate.enable`, `javascript.validate.enable`, `typescript.suggestionActions.enabled`, `javascript.suggestionActions.enabled` and `js/ts.implicitProjectConfig.*` are honoured.
 
+**Linters.** Every linter the project has runs, as in the editor, where each extension publishes its own diagnostics, and their diagnostics are combined. A project is on oxlint, on ESLint, or on both while it migrates: Yeap-UI-Apps is on oxlint since its default branch moved to TypeScript 7, and its older release branches are on ESLint. A linter that is not installed, or that the project does not configure, is silent; `--verbose` shows it as `unavailable`.
+
+**oxlint.** The CLI starts the language server of the project's oxlint (`oxlint --lsp`) in the workspace root, once per run and only when a file needs it, and asks it for the diagnostics of the text being processed, as the oxc extension does for an open document. Configuration discovery, nested configurations and ignore patterns are the server's own. It honours `oxc.enable`, `oxc.enable.oxlint`, `oxc.configPath`, `oxc.tsConfigPath`, `oxc.typeAware`, `oxc.disableNestedConfig`, `oxc.unusedDisableDirectives`, `oxc.fixKind`, `oxc.flags` (`fix_kind` and `disable_nested_config`), `oxc.lint.customization` and `oxc.path.oxlint`. It ignores `oxc.lint.run`, because the CLI always lints the current text, and `oxc.requireConfig`: without a configuration file, oxlint's default rules apply.
+
 **ESLint.** The CLI loads the project's ESLint through its Node API and computes the working directory with the rules of the VS Code ESLint extension (`eslint.workingDirectories`, including `!cwd`, patterns and modes). It honours `eslint.enable`, `eslint.validate`, `eslint.probe`, `eslint.options`, `eslint.useFlatConfig`, `eslint.quiet`, `eslint.nodePath` and `eslint.rules.customizations`. Only the rules TidyJS reads are executed when ESLint supports `ruleFilter` (ESLint 9).
 
-When a source cannot run, removal falls back to the other source:
+When a source cannot run, removal falls back to the others:
 
-- ESLint not installed or not configured: silent, as in VS Code. `--verbose` shows it.
-- ESLint or TypeScript failing (broken configuration, crash): a warning, and only the other source is used.
+- A linter not installed or not configured: silent, as in VS Code. `--verbose` shows it.
+- A broken oxlint configuration or an unknown rule: a warning carrying the message oxlint sends, and oxlint's default rules, as in the editor.
+- A linter or TypeScript failing (broken configuration, crash): a warning, and only the other sources are used.
 - No source at all: a warning, and nothing is removed. The imports are still sorted and aligned.
 
-## ESLint fixes on save
+## Fixes on save
 
-With the `editor` profile, the CLI applies the fixes that the ESLint extension applies when a file is saved, before TidyJS formats it. They run when `editor.codeActionsOnSave` in `<root>/.vscode/settings.json` enables `source.fixAll.eslint`, or `source.fixAll` without disabling `source.fixAll.eslint`, with `true`, `"explicit"` or `"always"`. A `[language]` block, such as `[typescriptreact]`, overrides the general value. In Yeap-UI-Apps, this is how `@typescript-eslint/consistent-type-imports` moves a type-only name into `import type`.
+With the `editor` profile, the CLI applies the fixes that the linter extensions apply when a file is saved, before TidyJS formats it. Each linter's fixes run when `editor.codeActionsOnSave` in `<root>/.vscode/settings.json` enables its kind (`source.fixAll.oxc` for oxlint, `source.fixAll.eslint` for ESLint), or `source.fixAll` without disabling that kind, with `true`, `"explicit"` or `"always"`. A `[language]` block, such as `[typescriptreact]`, overrides the general value. When both linters are enabled, oxlint's fixes run first and ESLint's run on the result. In Yeap-UI-Apps, this is how `consistent-type-imports` moves a type-only name into `import type`.
 
-The fixes come from the project's ESLint, through its Node API, with the rules of the ESLint extension (verified in version 3.0.34):
+Common rules:
+
+- Every fixable rule is applied, not only the rules about imports, as on save.
+- The fixes also apply to files that TidyJS skips (`excludedFolders`, `// tidyjs-ignore`), as on save.
+- `source.fixAll` also runs the TypeScript fixes, and `source.addMissingImports` adds imports. The CLI reproduces neither.
+- `--no-oxlint`, `--no-eslint`, `--no-diagnostics` and `--profile folder` turn the fixes off, linter by linter. `--verbose` prints `oxlint fixes: applied` or `none`, and the same for `eslint`, for each file.
+
+**oxlint fixes** are the `source.fixAll.oxc` code action of the language server (verified with oxlint 1.88.0 and the oxc extension 1.63.0). The server is asked for the action on the text of the file, and its text edits are applied. `oxc.fixKind` chooses the kind of fixes (`safe_fix` by default). `oxc.enable` set to `false` turns them off.
+
+**ESLint fixes** come from the project's ESLint, through its Node API, with the rules of the ESLint extension (verified in version 3.0.34):
 
 - ESLint is created with `eslint.options`, then `fix: true` and `eslint.codeActionsOnSave.options`, in the ESLint working directory, and lints the text of the file. Its `output` replaces the text.
 - `eslint.codeActionsOnSave.rules` turns off, for the fixes, every rule whose first matching pattern starts with `!` or that no pattern matches. An empty list turns off every rule.
-- Every fixable rule is applied, not only the rules about imports, as on save.
-- The fixes also apply to files that TidyJS skips (`excludedFolders`, `// tidyjs-ignore`), as on save.
 - `eslint.codeActionsOnSave.mode` set to `problems` applies the fixes the editor has already computed. That state only exists in the editor, so the CLI applies no fix and prints a warning.
-- `source.fixAll` also runs the TypeScript fixes, and `source.addMissingImports` adds imports. The CLI reproduces neither.
-
-`--no-eslint`, `--no-diagnostics` and `--profile folder` turn the fixes off. `--verbose` prints `eslint fixes: applied` or `none` for each file.
 
 ## Guards
 
@@ -125,25 +135,25 @@ Every guard of the extension applies:
 
 ## Speed
 
-Without diagnostics, a file takes about 1.5 ms. With `removeUnusedImports` or `removeMissingModules`, the CLI first decides each file from its syntax, and only runs the TypeScript checker and ESLint when that decision could differ from theirs.
+Without diagnostics, a file takes about 1.5 ms. With `removeUnusedImports` or `removeMissingModules`, the CLI first decides each file from its syntax, and only runs the TypeScript checker and the linters when that decision could differ from theirs.
 
-**Fast import analysis.** For each import, the CLI counts its references with the scope analysis ESLint uses, and resolves its module with TypeScript's own module resolution and the ambient `declare module` declarations of the project.
+**Fast import analysis.** For each import, the CLI counts its references with the scope analysis of typescript-eslint (`@typescript-eslint/scope-manager`), and resolves its module with TypeScript's own module resolution and the ambient `declare module` declarations of the project.
 
-- An import with at least one reference is used for both TypeScript and ESLint.
-- An import without reference is reported by TypeScript at the import itself, so the editor removes it whatever ESLint says.
+- An import with at least one reference is used for both TypeScript and the linters.
+- An import without reference is reported by TypeScript at the import itself, so the editor removes it whatever the linters say.
 - A module that TypeScript's resolution finds, or that an ambient declaration covers, is not missing.
 
-When that decision could differ from TypeScript or ESLint, the file falls back in two stages:
+When that decision could differ from TypeScript or the linters, the file falls back in two stages:
 
-- **File-only analysis.** Every module resolves, but an unused name may be decided differently by TypeScript and ESLint: every binding of a multi-binding import is unused (TypeScript then reports them without names), a name is cited in `{@link}` (or in a JSDoc type in a JavaScript file), the file is a declaration file or carries `@ts-check`/`@ts-nocheck`, a JavaScript file has `checkJs: false`, TypeScript suggestions are disabled, the JSX factory may be involved, or an import is reassigned. TypeScript checks the file alone, without its imports or the default library, which reports the same unused names as the whole project, and the project's ESLint lints it.
-- **Full analysis.** A module does not resolve, the file does not parse, or decorator metadata is emitted. TypeScript checks the file within its whole project, and ESLint lints it.
+- **File-only analysis.** Every module resolves, but an unused name may be decided differently by TypeScript and the linters: every binding of a multi-binding import is unused (TypeScript then reports them without names), a name is cited in `{@link}` (or in a JSDoc type in a JavaScript file), the file is a declaration file or carries `@ts-check`/`@ts-nocheck`, a JavaScript file has `checkJs: false`, TypeScript suggestions are disabled, the JSX factory may be involved, or an import is reassigned. TypeScript checks the file alone, without its imports or the default library, which reports the same unused names as the whole project, and the project's linters lint it.
+- **Full analysis.** A module does not resolve, the file does not parse, or decorator metadata is emitted. TypeScript checks the file within its whole project, and the linters lint it.
 
 On Yeap-UI-Apps, 1 file out of 1,976 needs the file-only analysis and none the full analysis.
 
 Other optimizations, none of which changes the result:
 
 - Files without imports skip the analysis.
-- ESLint runs in its own process, in parallel with TypeScript, and only when a file needs it.
+- Each linter runs in its own process, in parallel with TypeScript, and only when a file needs it.
 - Large runs use worker processes.
 - `--changed` and `--staged` limit a run to the files you touched.
 - A project on TypeScript 7 is analysed through the native compiler.
@@ -154,7 +164,7 @@ Other optimizations, none of which changes the result:
 
 `--typescript` can point a project still on TypeScript 6 to a TypeScript 7 install (`npm install --prefix ~/.tidyjs-ts7 typescript@7`, then `--typescript ~/.tidyjs-ts7/node_modules/typescript`) for the files that need the full analysis. The editor then runs another TypeScript version than the CLI: identical results were observed on Yeap-UI-Apps, but TypeScript 7 removed `baseUrl` and changed other options, so this is not guaranteed in general.
 
-Measured on Yeap-UI-Apps (Apple Silicon laptop, 10 cores, real source code):
+Measured on Yeap-UI-Apps with ESLint, before the CLI moved to oxlint (Apple Silicon laptop, 10 cores, real source code):
 
 | Run | Default | `--no-fast-analysis`, TypeScript 6 | VS Code, formatting an open file |
 |---|---|---|---|
@@ -164,7 +174,9 @@ Measured on Yeap-UI-Apps (Apple Silicon laptop, 10 cores, real source code):
 | 20 files | 0.30 s | 4.7 s | 0.3 s in total |
 | 1,976 files | 3.3 to 4.1 s | 24 s | not applicable |
 
-VS Code is faster per file because its TypeScript server and ESLint are already running; the CLI starts from nothing on every run.
+VS Code is faster per file because its TypeScript server and linters are already running; the CLI starts from nothing on every run.
+
+With oxlint, on the 1,462 files of `apps/paye` taken from the default branch of Yeap-UI-Apps (same laptop), a default run takes 3.7 to 4.1 s, `--no-fast-analysis` 19 s and `--no-diagnostics` 1.5 s. One file takes 0.2 s by default and 2.4 to 3.1 s with `--no-fast-analysis`. The fast analysis decided 1,149 files without starting oxlint. When the TypeScript checker runs, oxlint adds no measurable time, because its language server works in parallel (0.51 to 0.56 s for one file of a small project, with or without `--no-oxlint`). Running both linters costs nothing measurable either: on 1,455 files of `apps/paye` with 145 injected defects, with ESLint installed but not configured next to oxlint, as on the default branch of Yeap-UI-Apps, a default run took 6.3 to 8.5 s, against 6.5 to 7.1 s with oxlint alone and 6.5 to 6.9 s with ESLint alone.
 
 ## Yeap-UI-Apps
 
@@ -179,4 +191,4 @@ Git has no hook on `git add`, and VS Code stages with `git add` too, so `yarn co
 
 ## Compatibility tests
 
-`npm test` runs the CLI on `test/compat/fixtures/workspace` and compares every file with the output recorded in VS Code (`test/compat/expected`). `npm run test:compat:record` records that output again with a real VS Code instance, the TidyJS extension built from the repository and the ESLint extension.
+`npm test` runs the CLI on `test/compat/fixtures/workspace` and compares every file with the output recorded in VS Code (`test/compat/expected`). `npm run test:compat:record` records that output again with a real VS Code instance, the TidyJS extension built from the repository and the oxc extension. The ESLint path is covered by `test/compat/cli-eslint.test.ts`, which runs the built CLI on projects that have no oxlint.

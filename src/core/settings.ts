@@ -88,6 +88,18 @@ export function createSettingsReader(sectionTree: SettingsTree): SettingsReader 
     };
 }
 
+export function createFlatSettingsReader(section: string, entries: Record<string, unknown>): SettingsReader {
+    const lookup = (key: string): unknown => entries[`${section}.${key}`];
+
+    return {
+        has: (key) => lookup(key) !== undefined,
+        get: <T>(key: string): T | undefined => {
+            const value = lookup(key);
+            return value === undefined ? undefined : cloneValue(value) as T;
+        },
+    };
+}
+
 export function contributedDefaults(packageJson: unknown): Record<string, unknown> {
     const properties = (packageJson as {
         contributes?: { configuration?: { properties?: Record<string, { default?: unknown }> } };

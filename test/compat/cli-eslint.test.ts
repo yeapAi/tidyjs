@@ -34,7 +34,17 @@ const SOURCE = "import { join, resolve } from 'path';\nimport { readFileSync } f
 const WITHOUT_UNUSED = "// Other\nimport { readFileSync } from 'fs';\n\nexport const read = readFileSync;\n";
 const ONLY_FORMATTED = "// Other\nimport { readFileSync } from 'fs';\nimport {\n    join,\n    resolve\n}                       from 'path';\n\nexport const read = readFileSync;\n";
 
-describe('ESLint diagnostics through the built CLI', () => {
+function linkModulesWithoutOxlint(root: string): void {
+    const target = path.join(root, 'node_modules');
+    fs.mkdirSync(target);
+    for (const entry of fs.readdirSync(path.join(repoRoot, 'node_modules'))) {
+        if (!['oxlint', '@oxlint', '.bin'].includes(entry)) {
+            fs.symlinkSync(path.join(repoRoot, 'node_modules', entry), path.join(target, entry));
+        }
+    }
+}
+
+describe('ESLint diagnostics through the built CLI, in a project without oxlint', () => {
     let root: string;
 
     function write(relativePath: string, content: string): void {
@@ -55,7 +65,7 @@ describe('ESLint diagnostics through the built CLI', () => {
             write('.vscode/settings.json', JSON.stringify(options.settings));
         }
         if (options.installModules !== false) {
-            fs.symlinkSync(path.join(repoRoot, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+            linkModulesWithoutOxlint(root);
         }
     }
 
@@ -172,7 +182,7 @@ describe('ESLint diagnostics through the built CLI', () => {
                 'eslint.codeActionsOnSave.mode': 'problems',
             });
 
-            expect(result.stderr).toContain('ESLint fixes were not applied');
+            expect(result.stderr).toContain('eslint fixes were not applied');
             expect(result.output).toBe(TYPE_FORMATTED_ONLY);
         });
     });
