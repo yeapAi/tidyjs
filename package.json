@@ -35,6 +35,11 @@
         "category": "TidyJS"
       },
       {
+        "command": "tidyjs.checkForUpdates",
+        "title": "Check for Updates",
+        "category": "TidyJS"
+      },
+      {
         "command": "tidyjs.createConfigFile",
         "title": "Create Configuration File",
         "category": "TidyJS"
@@ -74,6 +79,11 @@
           "type": "boolean",
           "default": false,
           "description": "Enable debug logging"
+        },
+        "tidyjs.autoUpdate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check the GitHub releases of yeapAi/tidyjs once a day and install new versions automatically. Reload the window to use an installed version."
         },
         "tidyjs.groups": {
           "type": "array",
