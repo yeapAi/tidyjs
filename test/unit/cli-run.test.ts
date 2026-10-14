@@ -184,6 +184,10 @@ describe('runCli', () => {
         expect(stdout).toContain(`TypeScript ${require('typescript').version}`);
         expect(stdout).toContain('unused names: unused');
 
+        await run(['--verbose', '--typescript', path.join(repoRoot, 'node_modules/@typescript/old'), 'a.ts'], null);
+        expect(stdout).toContain(`TypeScript ${require('typescript').version}`);
+        expect(stdout).toContain('unused names: unused');
+
         await run(['--typescript', path.join(root, 'nowhere'), 'a.ts']);
         expect(stderr).toContain('typescript diagnostics failed: No TypeScript package found');
     });

@@ -24,6 +24,12 @@ The project uses **ESM output** (`"type": "module"` in package.json). The build 
 | `npm run check` | Full validation (type check + lint + test) |
 | `npm run build` | Build production extension |
 
+## TypeScript Toolchain
+
+`tsc` is TypeScript 7, the native compiler, installed under the alias `@typescript/native`. The `typescript` package is an alias of `@typescript/typescript6`, because TypeScript 7 no longer exposes the JavaScript compiler API that `ts-jest`, `typescript-eslint` and the classic analysis path of the CLI load by that name.
+
+The compatibility suites (`npm run test:compat`) run the CLI against both, so the native path is always exercised. Do not bump `typescript` to 7: `typescript-eslint` and `ts-jest` would fail on load.
+
 ## Project Architecture
 
 ### Core Components

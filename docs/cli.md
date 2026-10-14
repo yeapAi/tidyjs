@@ -147,6 +147,7 @@ Other optimizations, none of which changes the result:
 - Large runs use worker processes.
 - `--changed` and `--staged` limit a run to the files you touched.
 - A project on TypeScript 7 is analysed through the native compiler.
+- A project whose `typescript` package is `@typescript/typescript6`, kept for tools that need the classic API, is analysed through that classic API. `--typescript` accepts this package too.
 - The fast analysis reads the file list of each `tsconfig.json` from a cache in the system temporary folder (`tidyjs-tsconfig-cache`). The cache is used only while every file the configuration read and every folder its `include` walked keep the same modification time.
 - On Node.js 22.1 or later, `dist/cli.js` enables the V8 compile cache, so TidyJS and TypeScript are not compiled again on every run.
 - `oxc-parser` returns its syntax trees through raw transfer when the platform supports it, instead of JSON.
