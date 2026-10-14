@@ -2,7 +2,7 @@
   "name": "tidyjs",
   "displayName": "TidyJS",
   "description": "Automatically organizes and formats import declarations",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "publisher": "Asmir",
   "license": "MIT",
   "icon": "resources/small.png",
