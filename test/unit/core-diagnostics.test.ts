@@ -48,6 +48,16 @@ describe('analyzeImportDiagnostics', () => {
         expect(result.missingModules.size).toBe(0);
     });
 
+    test('collects unused names from oxlint, whose message says "imported" for imports', () => {
+        const result = analyze([
+            { source: 'oxc', code: 'eslint(no-unused-vars)', severity: 'error', message: "Identifier 'b' is imported but never used.\nhelp: Consider removing this import." },
+            { source: 'oxc', code: 'eslint(no-unused-vars)', severity: 'warning', message: "Variable 'local' is declared but never used. Unused variables should start with a '_'." },
+            { source: 'oxc', code: 'eslint(no-var)', severity: 'error', message: "'a' is declared but never used." },
+        ]);
+
+        expect(result.unusedImports).toEqual(['b']);
+    });
+
     test('does not match unused namespace imports (behavior of 1.9.2, kept for parity)', () => {
         const result = analyze([
             { source: 'eslint', code: '@typescript-eslint/no-unused-vars', severity: 'warning', message: "'ns' is defined but never used." },

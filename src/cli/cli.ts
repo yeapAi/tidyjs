@@ -4,11 +4,10 @@ import * as path from 'path';
 import { createSettingsReader, getSettingsSection } from '../core/settings';
 import { setLogSink } from '../utils/log';
 import { HELP_TEXT, parseCliArguments, UsageError } from './args';
-import { CliDiagnostics, LazyEslintLinter, LocalEslintLinter } from './diagnostics';
-import { EslintDiagnosticsProvider, readEslintEditorSettings } from './eslint-diagnostics';
-import { RemoteEslintLinter } from './eslint-host';
+import { CliDiagnostics } from './diagnostics';
 import { expandTargets } from './files';
 import { gitSelectedFiles } from './git';
+import { OxlintDiagnosticsProvider, readOxlintEditorSettings } from './oxlint-diagnostics';
 import { automaticJobCount, runInWorkers } from './parallel';
 import { Reporter } from './reporter';
 import { FileRunner } from './runner';
@@ -16,7 +15,6 @@ import { readTypeScriptEditorSettings, TypeScriptDiagnosticsProvider } from './t
 import { createCliWorkspace, findWorkspaceRoot } from './workspace';
 
 import type { CliArguments } from './args';
-import type { EslintLinter } from './eslint-host';
 import type { WorkerTask } from './parallel';
 import type { OutputStreams } from './reporter';
 import type { FileReport } from './runner';
@@ -71,21 +69,14 @@ function createSession(options: SessionOptions): Session {
         }), args.typescriptPath ? path.resolve(args.typescriptPath) : undefined)
         : undefined;
 
-    let eslint: EslintLinter | undefined;
-    if (args.eslint) {
-        const eslintSettings = readEslintEditorSettings(workspace.eslintSettings);
-        const selfScript = options.selfScript;
-        eslint = new LazyEslintLinter(() => selfScript
-            ? new RemoteEslintLinter(selfScript, eslintSettings)
-            : new LocalEslintLinter(new EslintDiagnosticsProvider(eslintSettings)));
-    }
+    const oxlint = args.oxlint ? new OxlintDiagnosticsProvider(readOxlintEditorSettings(workspace.oxcSettings)) : undefined;
 
-    const diagnostics = typescript || eslint ? new CliDiagnostics(typescript, eslint, args.fastAnalysis) : undefined;
+    const diagnostics = typescript || oxlint ? new CliDiagnostics(typescript, oxlint, args.fastAnalysis) : undefined;
     const runner = new FileRunner(workspace, diagnostics, {
         mode: args.mode,
         profile: args.profile,
         keepContents: args.diff,
-    }, eslint);
+    }, oxlint);
 
     return {
         run: (filePath) => runner.run(filePath),
@@ -94,21 +85,10 @@ function createSession(options: SessionOptions): Session {
                 return;
             }
             typescript?.prepare(files);
-            if (!eslint || args.fastAnalysis) {
-                return;
-            }
-            eslint.warm(files[0], workspace.rootFor(files[0]));
-            const needed: { filePath: string; workspaceRoot: string | undefined }[] = [];
-            for (const filePath of files) {
-                if (await runner.needsUnusedImportDiagnostics(filePath)) {
-                    needed.push({ filePath, workspaceRoot: workspace.rootFor(filePath) });
-                }
-            }
-            eslint.prefetch(needed);
         },
         dispose: async () => {
             runner.dispose();
-            eslint?.dispose();
+            oxlint?.dispose();
             await typescript?.dispose();
         },
     };
@@ -218,7 +198,7 @@ export async function runCli(argv: string[], environment: CliEnvironment): Promi
         selfScript: environment.selfScript,
     };
 
-    const usesDiagnostics = args.profile === 'editor' && (args.typescript || args.eslint);
+    const usesDiagnostics = args.profile === 'editor' && (args.typescript || args.oxlint);
     const jobs = !environment.selfScript ? 1 : Math.min(files.length, args.jobs ?? (usesDiagnostics ? automaticJobCount(files.length) : 1)) || 1;
 
     const reports: (FileReport | undefined)[] = new Array(files.length);

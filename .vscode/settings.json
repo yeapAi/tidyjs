@@ -13,11 +13,7 @@
       "dist": true // set this to false to include "dist" folder in search results
   },
   "typescript.tsc.autoDetect": "off",
-  "eslint.enable": true,
-  "eslint.validate": [
-    "javascript",
-    "typescript"
-  ],
+  "oxc.enable": true,
   "editor.codeActionsOnSave": {
     "source.addMissingImports": "always",
   },

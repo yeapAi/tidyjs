@@ -9,7 +9,7 @@ import type { ParserResult } from '../parser';
 import type { Config } from '../types';
 import type { FormatProfile } from '../core/pipeline';
 import type { CliDiagnostics, SourceReport } from './diagnostics';
-import type { EslintLinter } from './eslint-host';
+import type { OxlintLinter } from './oxlint-diagnostics';
 import type { CliWorkspace } from './workspace';
 
 export type RunMode = 'list' | 'check' | 'write';
@@ -30,7 +30,7 @@ export interface FileReport {
     removedUnused: string[];
     removedMissing: string[];
     sources: SourceReport[];
-    eslintFixes?: 'applied' | 'none';
+    oxlintFixes?: 'applied' | 'none';
 }
 
 export interface RunnerOptions {
@@ -51,24 +51,11 @@ export class FileRunner {
         private readonly workspace: CliWorkspace,
         private readonly diagnostics: CliDiagnostics | undefined,
         private readonly options: RunnerOptions,
-        private readonly eslint?: EslintLinter
+        private readonly oxlint?: OxlintLinter
     ) {}
 
     dispose(): void {
         this.parsers.clear();
-    }
-
-    async needsUnusedImportDiagnostics(filePath: string): Promise<boolean> {
-        if (this.options.profile !== 'editor' || !this.diagnostics) {
-            return false;
-        }
-        const resolved = await this.configFor(filePath);
-        if ('error' in resolved) {
-            return false;
-        }
-        return resolved.config.format?.removeUnusedImports === true
-            && validateConfiguration(resolved.config).isValid
-            && !isFileInExcludedFolder(filePath, resolved.config, this.workspace.rootFor(filePath));
     }
 
     private configFor(filePath: string): Promise<DirectoryConfig> {
@@ -116,8 +103,8 @@ export class FileRunner {
         }
 
         const excluded = isFileInExcludedFolder(filePath, config, workspaceRoot);
-        const eslintFixesOnSave = this.options.profile === 'editor' && this.eslint !== undefined && this.workspace.eslintFixAllOnSave(filePath);
-        if (excluded && !eslintFixesOnSave) {
+        const oxlintFixesOnSave = this.options.profile === 'editor' && this.oxlint !== undefined && this.workspace.oxlintFixAllOnSave(filePath);
+        if (excluded && !oxlintFixesOnSave) {
             report.status = 'skipped';
             report.reason = 'excluded';
             return report;
@@ -132,7 +119,7 @@ export class FileRunner {
 
         const hasBom = raw.startsWith(BOM);
         const original = hasBom ? raw.slice(1) : raw;
-        const text = eslintFixesOnSave ? await this.applyEslintFixes(filePath, original, workspaceRoot, report) : original;
+        const text = oxlintFixesOnSave ? await this.applyOxlintFixes(filePath, original, workspaceRoot, report) : original;
 
         if (excluded) {
             if (text === original) {
@@ -176,6 +163,9 @@ export class FileRunner {
             if (source.status === 'failed') {
                 report.warnings.push(`${source.source} diagnostics failed: ${source.detail ?? 'unknown error'}`);
             }
+            for (const warning of source.warnings ?? []) {
+                report.warnings.push(`${source.source}: ${warning}`);
+            }
         }
         if (outcome.diagnostics.error) {
             report.warnings.push(`unused and missing imports were not removed: ${outcome.diagnostics.error}`);
@@ -200,13 +190,13 @@ export class FileRunner {
         return this.complete(report, filePath, original, outcome.text, hasBom);
     }
 
-    private async applyEslintFixes(filePath: string, text: string, workspaceRoot: string | undefined, report: FileReport): Promise<string> {
+    private async applyOxlintFixes(filePath: string, text: string, workspaceRoot: string | undefined, report: FileReport): Promise<string> {
         try {
-            const { output } = await this.eslint!.fixAll(filePath, text, workspaceRoot);
-            report.eslintFixes = output !== undefined && output !== text ? 'applied' : 'none';
+            const { output } = await this.oxlint!.fixAll(filePath, text, workspaceRoot);
+            report.oxlintFixes = output !== undefined && output !== text ? 'applied' : 'none';
             return output ?? text;
         } catch (error) {
-            report.warnings.push(`ESLint fixes were not applied: ${error instanceof Error ? error.message : String(error)}`);
+            report.warnings.push(`oxlint fixes were not applied: ${error instanceof Error ? error.message : String(error)}`);
             return text;
         }
     }

@@ -31,7 +31,7 @@ describe('runCli', () => {
     async function run(argv: string[], fallbackModulesDir: string | null = repoRoot): Promise<number> {
         stdout = '';
         stderr = '';
-        return runCli(['--root', root, '--no-eslint', ...argv], {
+        return runCli(['--root', root, '--no-oxlint', ...argv], {
             cwd: root,
             stdout: (text) => { stdout += text; },
             stderr: (text) => { stderr += text; },

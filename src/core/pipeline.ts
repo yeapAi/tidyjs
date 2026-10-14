@@ -49,7 +49,7 @@ export interface FormatRequest {
 
 export class ParserCache {
     constructor(
-        private readonly entries: Map<string, ImportParser> = new Map(),
+        private readonly entries = new Map<string, ImportParser>(),
         private readonly maxEntries = Number.POSITIVE_INFINITY
     ) {}
 

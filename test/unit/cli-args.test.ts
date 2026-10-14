@@ -8,15 +8,15 @@ describe('parseCliArguments', () => {
             diff: false,
             profile: 'editor',
             typescript: true,
-            eslint: true,
+            oxlint: true,
         });
     });
 
     test('maps modes and switches', () => {
         expect(parseCliArguments(['-w', 'src'])).toMatchObject({ mode: 'write' });
         expect(parseCliArguments(['--check', '--diff', 'a.ts'])).toMatchObject({ mode: 'check', diff: true });
-        expect(parseCliArguments(['--no-eslint', 'a.ts'])).toMatchObject({ typescript: true, eslint: false });
-        expect(parseCliArguments(['--no-diagnostics', 'a.ts'])).toMatchObject({ typescript: false, eslint: false });
+        expect(parseCliArguments(['--no-oxlint', 'a.ts'])).toMatchObject({ typescript: true, oxlint: false });
+        expect(parseCliArguments(['--no-diagnostics', 'a.ts'])).toMatchObject({ typescript: false, oxlint: false });
         expect(parseCliArguments(['--profile', 'folder', '--root', '/repo', 'a.ts'])).toMatchObject({ profile: 'folder', root: '/repo' });
     });
 

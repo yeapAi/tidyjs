@@ -34,7 +34,7 @@ const typescript7 = path.join(repoRoot, 'node_modules/@typescript/native');
 const variants: [string, string[]][] = [
     ['default options', []],
     ['three worker processes', ['--jobs', '3']],
-    ['full TypeScript and ESLint analysis', ['--no-fast-analysis']],
+    ['full TypeScript and oxlint analysis', ['--no-fast-analysis']],
     ['TypeScript 7 native API', ['--typescript', typescript7]],
 ];
 

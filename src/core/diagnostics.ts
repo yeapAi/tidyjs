@@ -65,7 +65,7 @@ export interface ImportFilters {
     unusedImports?: string[];
 }
 
-export const UNUSED_IMPORT_CODES = ['unused-import', 'import-not-used', '6192', '6133', '6196', '@typescript-eslint/no-unused-vars'];
+export const UNUSED_IMPORT_CODES = ['unused-import', 'import-not-used', '6192', '6133', '6196', '@typescript-eslint/no-unused-vars', 'eslint(no-unused-vars)'];
 export const MODULE_NOT_FOUND_CODES = ['2307', '2318'];
 
 const UNUSED_SEVERITIES: readonly TidyDiagnosticSeverity[] = ['error', 'warning', 'hint'];
@@ -116,7 +116,7 @@ export function analyzeImportDiagnostics(
             }
 
             if (UNUSED_SEVERITIES.includes(diagnostic.severity) && UNUSED_IMPORT_CODES.includes(code)) {
-                const match = diagnostic.message.match(/'([^']+)' is (?:declared|defined) but (?:its value is )?never (?:read|used)\.?/);
+                const match = diagnostic.message.match(/'([^']+)' is (?:declared|defined|imported) but (?:its value is )?never (?:read|used)\.?/);
                 if (match && match[1] && (!importSpans || pointsToImportOf(diagnostic, match[1], importSpans))) {
                     unusedVariables.add(match[1]);
                     logDebug(`Unused variable detected: ${match[1]}`);

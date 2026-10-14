@@ -1,66 +1,74 @@
 {
-  "vscodeVersion": "1.140.0",
+  "vscodeVersion": "1.141.1",
   "files": [
     {
       "path": "src/app/feature/local.ts",
       "changed": false,
-      "formatMs": 8.741084,
+      "formatMs": 10.841916,
       "diagnostics": []
     },
     {
       "path": "src/app/feature/view.ts",
       "changed": true,
-      "formatMs": 25.529,
+      "formatMs": 44.258584,
       "diagnostics": []
     },
     {
       "path": "src/basic/empty.ts",
       "changed": false,
-      "formatMs": 2.932833,
-      "diagnostics": []
+      "formatMs": 6.247083,
+      "diagnostics": [
+        {
+          "source": "oxc",
+          "code": "unicorn(no-empty-file)",
+          "severity": "warning",
+          "message": "Empty files are not allowed.\nhelp: Delete this file or add some code to it.",
+          "line": 0
+        }
+      ]
     },
     {
       "path": "src/basic/import-kinds.ts",
       "changed": true,
-      "formatMs": 15.467584,
+      "formatMs": 36.702292,
       "diagnostics": []
     },
     {
       "path": "src/basic/polyfill.ts",
       "changed": false,
-      "formatMs": 3.984083,
+      "formatMs": 15.451125,
       "diagnostics": []
     },
     {
       "path": "src/comments/comments.ts",
       "changed": true,
-      "formatMs": 17.696417,
+      "formatMs": 16.985625,
       "diagnostics": []
     },
     {
       "path": "src/excluded/file.ts",
       "changed": false,
-      "formatMs": 3.028834,
+      "formatMs": 5.766,
       "diagnostics": [
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'createPatch' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 1
+        },
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'applyPatch' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 1
+        },
         {
           "source": "ts",
           "code": 6192,
           "severity": "hint",
           "message": "All imports in import declaration are unused.",
-          "line": 1
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'createPatch' is defined but never used.",
-          "line": 1
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'applyPatch' is defined but never used.",
           "line": 1
         }
       ]
@@ -68,27 +76,27 @@
     {
       "path": "src/ignored/pragma.ts",
       "changed": false,
-      "formatMs": 3.05975,
+      "formatMs": 6.556,
       "diagnostics": [
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'createPatch' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 2
+        },
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'applyPatch' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 2
+        },
         {
           "source": "ts",
           "code": 6192,
           "severity": "hint",
           "message": "All imports in import declaration are unused.",
-          "line": 2
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'createPatch' is defined but never used.",
-          "line": 2
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'applyPatch' is defined but never used.",
           "line": 2
         }
       ]
@@ -96,14 +104,21 @@
     {
       "path": "src/invalid-config/file.ts",
       "changed": true,
-      "formatMs": 7.520042,
+      "formatMs": 20.607083,
       "diagnostics": []
     },
     {
       "path": "src/invalid/syntax-error.ts",
       "changed": false,
-      "formatMs": 4.567,
+      "formatMs": 9.133458,
       "diagnostics": [
+        {
+          "source": "oxc",
+          "code": "",
+          "severity": "error",
+          "message": "Unexpected token",
+          "line": 3
+        },
         {
           "source": "ts",
           "code": 1109,
@@ -124,32 +139,26 @@
           "severity": "hint",
           "message": "'createPatch' is declared but its value is never read.",
           "line": 1
-        },
-        {
-          "source": "eslint",
-          "severity": "error",
-          "message": "Parsing error: Expression expected.",
-          "line": 3
         }
       ]
     },
     {
       "path": "src/js/component.jsx",
       "changed": true,
-      "formatMs": 10.042792,
+      "formatMs": 12.668542,
       "diagnostics": [
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'applyPatch' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 2
+        },
         {
           "source": "ts",
           "code": 6133,
           "severity": "hint",
           "message": "'applyPatch' is declared but its value is never read.",
-          "line": 2
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'applyPatch' is defined but never used.",
           "line": 2
         }
       ]
@@ -157,8 +166,22 @@
     {
       "path": "src/js/plain.js",
       "changed": true,
-      "formatMs": 12.8295,
+      "formatMs": 18.296709,
       "diagnostics": [
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'dirname' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 1
+        },
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'helper' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 2
+        },
         {
           "source": "ts",
           "code": 6133,
@@ -172,34 +195,27 @@
           "severity": "hint",
           "message": "'helper' is declared but its value is never read.",
           "line": 2
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'dirname' is defined but never used.",
-          "line": 1
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'helper' is defined but never used.",
-          "line": 2
         }
       ]
     },
     {
       "path": "src/local/local-config.ts",
       "changed": true,
-      "formatMs": 13.608125,
+      "formatMs": 60.611667,
       "diagnostics": []
     },
     {
       "path": "src/missing/missing-modules.ts",
       "changed": true,
-      "formatMs": 11.397375,
+      "formatMs": 12.716333,
       "diagnostics": [
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'fallback' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 1
+        },
         {
           "source": "ts",
           "code": 2307,
@@ -216,16 +232,16 @@
         },
         {
           "source": "ts",
+          "code": 2882,
+          "severity": "error",
+          "message": "Cannot find module or type declarations for side-effect import of './missing-side-effect'.",
+          "line": 3
+        },
+        {
+          "source": "ts",
           "code": 6133,
           "severity": "hint",
           "message": "'fallback' is declared but its value is never read.",
-          "line": 1
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'fallback' is defined but never used.",
           "line": 1
         }
       ]
@@ -233,32 +249,46 @@
     {
       "path": "src/placement/import-after-code.ts",
       "changed": true,
-      "formatMs": 13.035125,
+      "formatMs": 11.444583,
       "diagnostics": []
     },
     {
       "path": "src/post/with-imports.ts",
       "changed": true,
-      "formatMs": 13.533666,
+      "formatMs": 7.908667,
       "diagnostics": []
     },
     {
       "path": "src/post/without-imports.ts",
       "changed": true,
-      "formatMs": 8.79875,
+      "formatMs": 18.466083,
       "diagnostics": []
     },
     {
       "path": "src/shared/helper.ts",
       "changed": false,
-      "formatMs": 5.416667,
+      "formatMs": 6.850625,
       "diagnostics": []
     },
     {
       "path": "src/tsx/component.tsx",
       "changed": true,
-      "formatMs": 19.493084,
+      "formatMs": 14.705709,
       "diagnostics": [
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'useMemo' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 1
+        },
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'view' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 2
+        },
         {
           "source": "ts",
           "code": 7026,
@@ -286,53 +316,39 @@
           "severity": "hint",
           "message": "'view' is declared but its value is never read.",
           "line": 2
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'useMemo' is defined but never used.",
-          "line": 1
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'view' is defined but never used.",
-          "line": 2
         }
       ]
     },
     {
       "path": "src/types/react.d.ts",
       "changed": false,
-      "formatMs": 3.88525,
+      "formatMs": 2.56975,
       "diagnostics": []
     },
     {
       "path": "src/unused/all-specifiers-unused.ts",
       "changed": true,
-      "formatMs": 13.747791,
+      "formatMs": 11.800625,
       "diagnostics": [
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'join' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 0
+        },
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'resolve' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 0
+        },
         {
           "source": "ts",
           "code": 6192,
           "severity": "hint",
           "message": "All imports in import declaration are unused.",
-          "line": 0
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'join' is defined but never used.",
-          "line": 0
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'resolve' is defined but never used.",
           "line": 0
         }
       ]
@@ -340,8 +356,22 @@
     {
       "path": "src/unused/same-name-parameter.ts",
       "changed": true,
-      "formatMs": 12.614708,
+      "formatMs": 13.074666,
       "diagnostics": [
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'readFileSync' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 1
+        },
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Parameter 'createPatch' is declared but never used. Unused parameters should start with a '_'.\nhelp: Consider removing this parameter.",
+          "line": 4
+        },
         {
           "source": "ts",
           "code": 6133,
@@ -355,28 +385,42 @@
           "severity": "hint",
           "message": "'createPatch' is declared but its value is never read.",
           "line": 4
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'readFileSync' is defined but never used.",
-          "line": 1
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'createPatch' is defined but never used.",
-          "line": 4
         }
       ]
     },
     {
       "path": "src/unused/single-specifiers.ts",
       "changed": true,
-      "formatMs": 14.21575,
+      "formatMs": 16.346416,
       "diagnostics": [
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'writeFileSync' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 0
+        },
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'path' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 1
+        },
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Type 'Stats' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 2
+        },
+        {
+          "source": "oxc",
+          "code": "eslint(no-unused-vars)",
+          "severity": "warning",
+          "message": "Identifier 'os' is imported but never used.\nhelp: Consider removing this import.",
+          "line": 3
+        },
         {
           "source": "ts",
           "code": 6133,
@@ -403,34 +447,6 @@
           "code": 6133,
           "severity": "hint",
           "message": "'os' is declared but its value is never read.",
-          "line": 3
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'writeFileSync' is defined but never used.",
-          "line": 0
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'path' is defined but never used.",
-          "line": 1
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'Stats' is defined but never used.",
-          "line": 2
-        },
-        {
-          "source": "eslint",
-          "code": "@typescript-eslint/no-unused-vars",
-          "severity": "warning",
-          "message": "'os' is defined but never used.",
           "line": 3
         }
       ]

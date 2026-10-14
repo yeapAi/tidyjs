@@ -42,7 +42,7 @@ TidyJS automatically organizes, groups, and aligns import declarations with AST-
 
 ### Command Line
 
-The same engine runs outside VS Code, with the TypeScript and ESLint diagnostics computed by the CLI itself:
+The same engine runs outside VS Code, with the TypeScript and oxlint diagnostics computed by the CLI itself:
 
 ```bash
 node ~/.vscode/extensions/asmir.tidyjs-<version>/dist/cli.js --check .    # exit 1 when a file would change

@@ -3,9 +3,9 @@ import * as path from 'path';
 import { parse as parseJsonc } from 'jsonc-parser';
 
 import { FileConfigSources } from '../core/config';
-import { languageIdFor } from './eslint-diagnostics';
 import {
     contributedDefaults,
+    createFlatSettingsReader,
     createSettingsReader,
     getSettingsSection,
     mergeSettingsTrees,
@@ -21,6 +21,7 @@ const WORKSPACE_MARKERS = ['.git', '.vscode'];
 export interface WorkspaceSettingsLoad {
     tree: SettingsTree;
     languageOverrides: Record<string, Record<string, unknown>>;
+    flatEntries: Record<string, unknown>;
     path?: string;
     warning?: string;
 }
@@ -31,9 +32,9 @@ export interface CliWorkspace {
     settingsWarning?: string;
     settings: SettingsTree;
     tidyjsSettings: SettingsReader;
-    eslintSettings: SettingsReader;
+    oxcSettings: SettingsReader;
     fileSources: FileConfigSources;
-    eslintFixAllOnSave(filePath: string): boolean;
+    oxlintFixAllOnSave(filePath: string): boolean;
     rootFor(filePath: string): string | undefined;
     resolutionContext(filePath: string): ConfigResolutionContext;
 }
@@ -63,13 +64,13 @@ export function loadWorkspaceSettings(root: string): WorkspaceSettingsLoad {
     try {
         content = fs.readFileSync(settingsPath, 'utf8');
     } catch {
-        return { tree: {}, languageOverrides: {} };
+        return { tree: {}, languageOverrides: {}, flatEntries: {} };
     }
 
     const errors: ParseError[] = [];
     const parsed: unknown = parseJsonc(content, errors, { allowTrailingComma: true, disallowComments: false });
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-        return { tree: {}, languageOverrides: {}, path: settingsPath, warning: `${settingsPath} is not a JSON object; VS Code settings ignored` };
+        return { tree: {}, languageOverrides: {}, flatEntries: {}, path: settingsPath, warning: `${settingsPath} is not a JSON object; VS Code settings ignored` };
     }
 
     const warning = errors.length > 0
@@ -91,22 +92,37 @@ export function loadWorkspaceSettings(root: string): WorkspaceSettingsLoad {
         }
     }
 
-    return { tree: settingsTreeFromFlatEntries(flatEntries), languageOverrides, path: settingsPath, warning };
+    return { tree: settingsTreeFromFlatEntries(flatEntries), languageOverrides, flatEntries, path: settingsPath, warning };
+}
+
+export function languageIdFor(filePath: string): string {
+    switch (path.extname(filePath).toLowerCase()) {
+        case '.ts':
+        case '.mts':
+        case '.cts':
+            return 'typescript';
+        case '.tsx':
+            return 'typescriptreact';
+        case '.jsx':
+            return 'javascriptreact';
+        default:
+            return 'javascript';
+    }
 }
 
 function isCodeActionEnabled(value: unknown): boolean {
     return value === true || value === 'explicit' || value === 'always';
 }
 
-export function codeActionsRunEslintFixAll(codeActionsOnSave: unknown): boolean {
+export function codeActionsRunOxlintFixAll(codeActionsOnSave: unknown): boolean {
     if (Array.isArray(codeActionsOnSave)) {
-        return codeActionsOnSave.includes('source.fixAll.eslint') || codeActionsOnSave.includes('source.fixAll');
+        return codeActionsOnSave.includes('source.fixAll.oxc') || codeActionsOnSave.includes('source.fixAll');
     }
     if (typeof codeActionsOnSave !== 'object' || codeActionsOnSave === null) {
         return false;
     }
     const kinds = codeActionsOnSave as Record<string, unknown>;
-    return 'source.fixAll.eslint' in kinds ? isCodeActionEnabled(kinds['source.fixAll.eslint']) : isCodeActionEnabled(kinds['source.fixAll']);
+    return 'source.fixAll.oxc' in kinds ? isCodeActionEnabled(kinds['source.fixAll.oxc']) : isCodeActionEnabled(kinds['source.fixAll']);
 }
 
 function mergeCodeActions(general: unknown, language: unknown): unknown {
@@ -122,7 +138,7 @@ export function createCliWorkspace(root: string, packageJson: unknown): CliWorks
     const defaults = settingsTreeFromFlatEntries(contributedDefaults(packageJson));
     const settings = mergeSettingsTrees(defaults, loaded.tree);
     const tidyjsSettings = createSettingsReader(getSettingsSection(settings, 'tidyjs'));
-    const eslintSettings = createSettingsReader(getSettingsSection(settings, 'eslint'));
+    const oxcSettings = createFlatSettingsReader('oxc', loaded.flatEntries);
     const codeActionsOnSave = createSettingsReader(getSettingsSection(settings, 'editor')).get<unknown>('codeActionsOnSave');
     const fileSources = new FileConfigSources();
     const rootFor = (filePath: string): string | undefined => (isInsideDirectory(filePath, root) ? root : undefined);
@@ -133,9 +149,9 @@ export function createCliWorkspace(root: string, packageJson: unknown): CliWorks
         settingsWarning: loaded.warning,
         settings,
         tidyjsSettings,
-        eslintSettings,
+        oxcSettings,
         fileSources,
-        eslintFixAllOnSave: (filePath) => codeActionsRunEslintFixAll(mergeCodeActions(
+        oxlintFixAllOnSave: (filePath) => codeActionsRunOxlintFixAll(mergeCodeActions(
             codeActionsOnSave,
             loaded.languageOverrides[languageIdFor(filePath)]?.['editor.codeActionsOnSave']
         )),

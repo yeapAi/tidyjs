@@ -3,7 +3,6 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 import { EXIT_ERROR, runCli, runWorker } from './cli';
-import { ESLINT_HOST_FLAG, runEslintHost } from './eslint-host';
 import { WORKER_FLAG } from './parallel';
 import { enableRawTransfer } from '../utils/oxc-parse';
 
@@ -14,9 +13,7 @@ const mode = process.argv[2];
 
 enableRawTransfer();
 
-if (mode === ESLINT_HOST_FLAG) {
-    runEslintHost();
-} else if (mode === WORKER_FLAG) {
+if (mode === WORKER_FLAG) {
     runWorker();
 } else {
     runCli(process.argv.slice(2), {

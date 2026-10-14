@@ -18,7 +18,7 @@ resources/large.png
 .gitignore
 .vscodeignore
 CLAUDE.md
-eslint.config.mjs
+.oxlintrc.json
 jest.config.js
 tsconfig.json
 tsconfig.test.json

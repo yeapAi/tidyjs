@@ -1,4 +1,4 @@
-export type DiagnosticsSource = 'typescript' | 'eslint';
+export type DiagnosticsSource = 'typescript' | 'oxlint';
 
 export class DiagnosticsUnavailableError extends Error {
     constructor(readonly source: DiagnosticsSource, message: string) {
