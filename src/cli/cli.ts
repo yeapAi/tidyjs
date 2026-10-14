@@ -4,7 +4,9 @@ import * as path from 'path';
 import { createSettingsReader, getSettingsSection } from '../core/settings';
 import { setLogSink } from '../utils/log';
 import { HELP_TEXT, parseCliArguments, UsageError } from './args';
-import { CliDiagnostics } from './diagnostics';
+import { CliDiagnostics, LazyEslintLinter, LocalEslintLinter } from './diagnostics';
+import { EslintDiagnosticsProvider, readEslintEditorSettings } from './eslint-diagnostics';
+import { RemoteEslintLinter } from './eslint-host';
 import { expandTargets } from './files';
 import { gitSelectedFiles } from './git';
 import { OxlintDiagnosticsProvider, readOxlintEditorSettings } from './oxlint-diagnostics';
@@ -15,6 +17,7 @@ import { readTypeScriptEditorSettings, TypeScriptDiagnosticsProvider } from './t
 import { createCliWorkspace, findWorkspaceRoot } from './workspace';
 
 import type { CliArguments } from './args';
+import type { Linter } from './linter';
 import type { WorkerTask } from './parallel';
 import type { OutputStreams } from './reporter';
 import type { FileReport } from './runner';
@@ -69,14 +72,24 @@ function createSession(options: SessionOptions): Session {
         }), args.typescriptPath ? path.resolve(args.typescriptPath) : undefined)
         : undefined;
 
-    const oxlint = args.oxlint ? new OxlintDiagnosticsProvider(readOxlintEditorSettings(workspace.oxcSettings)) : undefined;
+    const linters: Linter[] = [];
+    if (args.oxlint) {
+        linters.push(new OxlintDiagnosticsProvider(readOxlintEditorSettings(workspace.oxcSettings)));
+    }
+    if (args.eslint) {
+        const eslintSettings = readEslintEditorSettings(workspace.eslintSettings);
+        const selfScript = options.selfScript;
+        linters.push(new LazyEslintLinter(() => selfScript
+            ? new RemoteEslintLinter(selfScript, eslintSettings)
+            : new LocalEslintLinter(new EslintDiagnosticsProvider(eslintSettings))));
+    }
 
-    const diagnostics = typescript || oxlint ? new CliDiagnostics(typescript, oxlint, args.fastAnalysis) : undefined;
+    const diagnostics = typescript || linters.length > 0 ? new CliDiagnostics(typescript, linters, args.fastAnalysis) : undefined;
     const runner = new FileRunner(workspace, diagnostics, {
         mode: args.mode,
         profile: args.profile,
         keepContents: args.diff,
-    }, oxlint);
+    }, linters);
 
     return {
         run: (filePath) => runner.run(filePath),
@@ -85,10 +98,26 @@ function createSession(options: SessionOptions): Session {
                 return;
             }
             typescript?.prepare(files);
+            const warming = linters.filter((linter) => linter.warm || linter.prefetch);
+            if (warming.length === 0 || args.fastAnalysis) {
+                return;
+            }
+            const needed: { filePath: string; workspaceRoot: string | undefined }[] = [];
+            for (const filePath of files) {
+                if (await runner.needsUnusedImportDiagnostics(filePath)) {
+                    needed.push({ filePath, workspaceRoot: workspace.rootFor(filePath) });
+                }
+            }
+            for (const linter of warming) {
+                linter.warm?.(files[0], workspace.rootFor(files[0]));
+                linter.prefetch?.(needed);
+            }
         },
         dispose: async () => {
             runner.dispose();
-            oxlint?.dispose();
+            for (const linter of linters) {
+                linter.dispose();
+            }
             await typescript?.dispose();
         },
     };
@@ -198,7 +227,7 @@ export async function runCli(argv: string[], environment: CliEnvironment): Promi
         selfScript: environment.selfScript,
     };
 
-    const usesDiagnostics = args.profile === 'editor' && (args.typescript || args.oxlint);
+    const usesDiagnostics = args.profile === 'editor' && (args.typescript || args.oxlint || args.eslint);
     const jobs = !environment.selfScript ? 1 : Math.min(files.length, args.jobs ?? (usesDiagnostics ? automaticJobCount(files.length) : 1)) || 1;
 
     const reports: (FileReport | undefined)[] = new Array(files.length);

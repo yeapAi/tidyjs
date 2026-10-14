@@ -8,6 +8,7 @@ import { languageIdFor } from './workspace';
 
 import type { SettingsReader } from '../core/config';
 import type { TidyDiagnostic, TidyDiagnosticSeverity } from '../core/diagnostics';
+import type { Linter, LinterFixResult, LinterLintResult } from './linter';
 
 const SERVER_CONFIGURATION_SECTION = 'oxc_language_server';
 const FIX_ALL_KIND = 'source.fixAll.oxc';
@@ -31,28 +32,6 @@ export interface OxlintEditorSettings {
     enable: boolean;
     binaryPath?: string;
     server: OxlintServerOptions;
-}
-
-export type OxlintFileStatus = 'linted' | 'disabled' | 'not-installed';
-
-export interface OxlintLintResult {
-    status: OxlintFileStatus;
-    diagnostics: TidyDiagnostic[];
-    warnings?: string[];
-    workingDirectory?: string;
-    oxlintPath?: string;
-}
-
-export interface OxlintFixResult {
-    status: OxlintFileStatus;
-    output?: string;
-    workingDirectory?: string;
-}
-
-export interface OxlintLinter {
-    lint(filePath: string, text: string, workspaceRoot: string | undefined): Promise<OxlintLintResult>;
-    fixAll(filePath: string, text: string, workspaceRoot: string | undefined): Promise<OxlintFixResult>;
-    dispose(): void;
 }
 
 interface LspPosition { line: number; character: number }
@@ -265,7 +244,8 @@ class OxlintServer {
     }
 }
 
-export class OxlintDiagnosticsProvider implements OxlintLinter {
+export class OxlintDiagnosticsProvider implements Linter {
+    readonly name = 'oxlint';
     private readonly servers = new Map<string, Promise<OxlintServer>>();
 
     constructor(private readonly settings: OxlintEditorSettings) {}
@@ -285,7 +265,7 @@ export class OxlintDiagnosticsProvider implements OxlintLinter {
         return server;
     }
 
-    async lint(filePath: string, text: string, workspaceRoot: string | undefined): Promise<OxlintLintResult> {
+    async lint(filePath: string, text: string, workspaceRoot: string | undefined): Promise<LinterLintResult> {
         if (!this.settings.enable) {
             return { status: 'disabled', diagnostics: [] };
         }
@@ -316,10 +296,10 @@ export class OxlintDiagnosticsProvider implements OxlintLinter {
                 length: offsetAt(lineStarts, diagnostic.range.end, text.length) - start,
             };
         });
-        return { status: 'linted', diagnostics, warnings, workingDirectory, oxlintPath: executable.path };
+        return { status: 'linted', diagnostics, warnings, workingDirectory };
     }
 
-    async fixAll(filePath: string, text: string, workspaceRoot: string | undefined): Promise<OxlintFixResult> {
+    async fixAll(filePath: string, text: string, workspaceRoot: string | undefined): Promise<LinterFixResult> {
         if (!this.settings.enable) {
             return { status: 'disabled' };
         }

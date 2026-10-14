@@ -25,7 +25,7 @@ The parser, the IR, the formatter, the sorters and the re-export organizer did n
 
 | VS Code API | Current use | Information actually needed | CLI equivalent | Responsible module |
 |---|---|---|---|---|
-| `languages.getDiagnostics(uri)` | `removeUnusedImports`, `removeMissingModules` | Diagnostics of one file: code, message, severity | TypeScript `LanguageService` (syntactic, semantic, suggestion) and the oxlint language server | `src/core/diagnostics.ts`, `src/cli/typescript-diagnostics.ts`, `src/cli/oxlint-diagnostics.ts`, `src/cli/lsp-connection.ts` |
+| `languages.getDiagnostics(uri)` | `removeUnusedImports`, `removeMissingModules` | Diagnostics of one file: code, message, severity | TypeScript `LanguageService` (syntactic, semantic, suggestion), the oxlint language server and the ESLint Node API | `src/core/diagnostics.ts`, `src/cli/typescript-diagnostics.ts`, `src/cli/oxlint-diagnostics.ts`, `src/cli/lsp-connection.ts`, `src/cli/eslint-diagnostics.ts` |
 | `DiagnosticSeverity`, `Diagnostic.code` (`string`, `number` or `{ value, target }`) | Filtering by severity and code | Normalized severity and code | `TidyDiagnostic` | `src/core/diagnostics.ts`, `src/vscode/diagnostics.ts` |
 | `workspace.getConfiguration('tidyjs'[, uri])`, `has`, `get` | Settings source merged under `.tidyjsrc` | Contributed defaults plus workspace `tidyjs.*` values, as VS Code would merge them | `package.json` defaults plus `<root>/.vscode/settings.json`, behind the same `has`/`get` contract | `src/core/settings.ts`, `src/cli/workspace.ts` |
 | `workspace.getWorkspaceFolder(uri)` | Config search boundary, `excludedFolders`, alias base, tsconfig search boundary | One root directory per file | `--root`, otherwise the nearest ancestor holding `.git` or `.vscode`, otherwise the current directory | `src/cli/workspace.ts` |
@@ -66,21 +66,23 @@ The parser then drops whole imports whose source is missing and individual speci
 - **TypeScript server plugins and project heuristics.** tsserver may load plugins declared in `compilerOptions.plugins` and uses an inferred project for files outside any tsconfig. The CLI reproduces project selection and inferred options but loads no plugin.
 - **Localized messages.** Covered above.
 - **oxc extension settings.** `oxc.enable`, `oxc.enable.oxlint`, `oxc.configPath`, `oxc.tsConfigPath`, `oxc.typeAware`, `oxc.disableNestedConfig`, `oxc.unusedDisableDirectives`, `oxc.fixKind`, `oxc.flags`, `oxc.lint.customization` and `oxc.path.oxlint` are read from `.vscode/settings.json` and sent to the language server in the shape the oxc extension uses. `oxc.lint.run` is ignored (section 6).
+- **ESLint extension settings.** `eslint.workingDirectories`, `eslint.enable`, `eslint.validate`, `eslint.probe`, `eslint.options`, `eslint.useFlatConfig`, `eslint.quiet`, `eslint.nodePath` and `eslint.rules.customizations` are read from `.vscode/settings.json` and applied as the ESLint extension does. The only remaining difference concerns the extension's cache of `eslint.rules.customizations` (section 6).
+- **Which linters run.** Every linter the project has, as in the editor, where each extension publishes its own diagnostics: Yeap-UI-Apps is on oxlint since its default branch moved to TypeScript 7, and its release branches `releases/v1.100` to `releases/v1.116` are on ESLint. A linter that is not installed or not configured is silent.
 
 ## 2. Options considered for diagnostics
 
-| Criterion | A. TypeScript API + oxlint language server | B. Headless VS Code | C. Hybrid (A by default, B on demand) |
+| Criterion | A. TypeScript API + linters from Node (oxlint language server, ESLint API) | B. Headless VS Code | C. Hybrid (A by default, B on demand) |
 |---|---|---|---|
 | Reliability | Deterministic: diagnostics are computed, not awaited | Depends on server readiness; the 1.9.2 parity bench needed waits for both TypeScript and the linter | As A, plus B's flakiness when enabled |
 | Performance | One program per tsconfig, reused across files | Electron start, extension host, project load for every run | As A |
-| Installation | `typescript` and `oxlint` from the project | VS Code binary, a display server on Linux CI, oxc extension installed in the test profile | Both |
+| Installation | `typescript`, `oxlint` and `eslint` from the project | VS Code binary, a display server on Linux CI, oxc extension installed in the test profile | Both |
 | Portability | Any Node 20+ platform supported by `oxc-parser` | Electron platforms only; headless Linux needs `xvfb` | Both |
 | Reproducibility | Same inputs, same output | Depends on profile, extensions and timing | Mixed |
 | CI/CD | Native | Heavy and fragile | Optional |
-| Complexity | Project selection to reproduce, and an oxlint server to drive | Process control, IPC, timeouts | Highest |
-| Fidelity | Same TypeScript checker and same oxlint server as the editor uses; differences are documented above | Highest in theory, lower in practice because of timing | Highest when B is enabled |
+| Complexity | Project selection and ESLint working directory to reproduce, and an oxlint server to drive | Process control, IPC, timeouts | Highest |
+| Fidelity | Same TypeScript checker, same oxlint server and same ESLint rules as the editor uses; differences are documented above | Highest in theory, lower in practice because of timing | Highest when B is enabled |
 
-**Decision: A.** The editor's diagnostics come from the same two engines that the CLI calls directly: the TypeScript language service and the oxlint language server. Reproducing their inputs (project, compiler options, configuration, rule set) gives the editor's settled result without its timing problem. Headless VS Code is kept where it is useful, as a test harness that records reference outputs (`test/compat`), not as a runtime dependency.
+**Decision: A.** The editor's diagnostics come from the same two engines that the CLI calls directly: the TypeScript language service and the linters, the oxlint language server and ESLint. Reproducing their inputs (project, compiler options, configuration, working directory, rule set) gives the editor's settled result without its timing problem. Headless VS Code is kept where it is useful, as a test harness that records reference outputs (`test/compat`), not as a runtime dependency.
 
 ## 3. Target architecture
 
@@ -99,7 +101,7 @@ The parser then drops whole imports whose source is missing and individual speci
        │   VS Code adapter    │                │     CLI adapter      │
        │ src/extension.ts     │                │ src/cli/             │
        │ src/vscode/          │                │ TypeScript API       │
-       │ getDiagnostics       │                │ oxlint language server│
+       │ getDiagnostics       │                │ oxlint LSP · ESLint   │
        │ getConfiguration     │                │ .vscode/settings.json│
        │ OutputChannel, edits │                │ fs, stdout/stderr    │
        └─────────────────────┘                 └──────────────────────┘
@@ -113,12 +115,12 @@ The oxlint configuration of this repository forbids importing `vscode` outside `
 |---|---|---|
 | Core | `src/parser.ts`, `src/formatter.ts`, `src/ir/`, `src/destructuring-sorter.ts`, `src/reexport-organizer.ts`, `src/batch-formatter.ts`, `src/utils/*`, `src/core/config.ts`, `src/core/settings.ts`, `src/core/diagnostics.ts`, `src/core/pipeline.ts` | `oxc-parser`, `jsonc-parser`, Node `fs`/`path` |
 | VS Code adapter | `src/extension.ts`, `src/vscode/config-manager.ts`, `src/vscode/config-loader.ts`, `src/vscode/diagnostics.ts`, `src/vscode/log-sink.ts`, `src/vscode/messages.ts` | `vscode` and the core |
-| CLI adapter | `src/cli/main.ts`, `cli.ts`, `args.ts`, `workspace.ts`, `files.ts`, `git.ts`, `runner.ts`, `reporter.ts`, `parallel.ts`, `diagnostics.ts`, `diagnostic-errors.ts`, `typescript-diagnostics.ts`, `tsconfig-cache.ts`, `import-oracle.ts`, `oxlint-diagnostics.ts`, `lsp-connection.ts` | the core, the project's `typescript` and `oxlint` at runtime |
+| CLI adapter | `src/cli/main.ts`, `cli.ts`, `args.ts`, `workspace.ts`, `files.ts`, `git.ts`, `runner.ts`, `reporter.ts`, `parallel.ts`, `diagnostics.ts`, `diagnostic-errors.ts`, `typescript-diagnostics.ts`, `tsconfig-cache.ts`, `import-oracle.ts`, `linter.ts`, `oxlint-diagnostics.ts`, `lsp-connection.ts`, `eslint-diagnostics.ts`, `eslint-host.ts` | the core, the project's `typescript`, `oxlint` and `eslint` at runtime |
 
 The abstractions shared by both adapters:
 
 - `Config` and `resolveConfigForFile(filePath, context)`: the configuration of a file, from a `.tidyjsrc`/`tidyjs.json` source and two `SettingsReader`s with the `has`/`get` contract of `WorkspaceConfiguration`.
-- `TidyDiagnostic`: `{ source, code, message, severity, start, length }`. The VS Code adapter converts `vscode.Diagnostic`; the CLI produces it from TypeScript and oxlint.
+- `TidyDiagnostic`: `{ source, code, message, severity, start, length }`. The VS Code adapter converts `vscode.Diagnostic`; the CLI produces it from TypeScript, oxlint and ESLint.
 - `formatSource(request)`: the format-on-save pipeline, with a `profile` (`editor` or `folder`) and an optional asynchronous diagnostics supplier. It returns `changed`, `unchanged` (with a reason and an optional parse error) or `failed` (with the stage). It never writes and never notifies: each adapter decides how to apply the text and what to show.
 - `LogSink`: where `logDebug` and `logError` go. The VS Code adapter installs the output channel; the CLI writes to stderr when `--debug` or `--verbose` is set.
 
@@ -145,11 +147,13 @@ Each row was observed or checked with the compatibility suite (`test/compat`) or
 | Automatic type acquisition (ATA) | Environment | No, without network and a global cache | Yes | For JavaScript files outside any `tsconfig.json`/`jsconfig.json`, tsserver downloads `@types/*` into a global cache. With `@types/react`, `react/jsx-runtime` resolves and a `React` default import becomes unused in the editor but not in the CLI. Adding a `jsconfig.json`, or installing the types in the project, removes the difference. |
 | TypeScript version | Environment | Yes | Yes | VS Code uses its bundled TypeScript unless the workspace version is selected; the CLI uses the project's. `--verbose` prints the version. Selecting **TypeScript: Select TypeScript Version > Use Workspace Version** aligns both. |
 | TypeScript server plugins | Environment | No | Yes | Plugins declared in `compilerOptions.plugins` run only in the editor. |
-| Localized TypeScript messages | Environment | Yes | Yes | The unused-name pattern is English. With `typescript.locale` set to another language, TypeScript-based removal does nothing in the editor; the CLI always gets English messages. oxlint messages are not localized. |
+| Localized TypeScript messages | Environment | Yes | Yes | The unused-name pattern is English. With `typescript.locale` set to another language, TypeScript-based removal does nothing in the editor; the CLI always gets English messages. Linter messages are not localized. |
 | User settings | Environment | No, by design | Yes | The CLI reads `<root>/.vscode/settings.json` and the extension defaults, not the user profile. |
 | Multi-root workspaces | Environment | Yes, with `--root` | Yes | The CLI has one root per run. |
+| ESLint fixes in `problems` mode | Environment | No | Yes | With `eslint.codeActionsOnSave.mode` set to `problems`, the editor applies the fixes it has already computed for the document. The CLI applies none and warns; in the default `all` mode it applies the same fixes as the editor. |
+| `eslint.rules.customizations` cache | Environment | No | Yes | The extension caches an override per rule regardless of `fixable`; the CLI evaluates every message. Both give the same severity unless a rule mixes fixable and non-fixable reports with a `fixable` filter. |
 | `oxc.lint.run` | Intentional | Not applicable | Yes | With `onSave`, the oxc extension publishes diagnostics only after a save, so a save can use the diagnostics of the previous one. The CLI always lints the text it is about to format. |
-| TypeScript fixes and missing imports on save | Not reproduced | Yes | Yes | `source.fixAll` also runs the TypeScript fixes, and `source.addMissingImports` adds imports. The CLI only reproduces `source.fixAll.oxc`. |
+| TypeScript fixes and missing imports on save | Not reproduced | Yes | Yes | `source.fixAll` also runs the TypeScript fixes, and `source.addMissingImports` adds imports. The CLI only reproduces `source.fixAll.oxc` and `source.fixAll.eslint`. |
 | Concurrent edits | Environment | Not applicable | Yes | The editor abandons and retries when the document changes during formatting; files on disk do not change during a run. |
 
 ### Behaviors of 1.9.2 kept identical in both runtimes
@@ -163,7 +167,7 @@ Each row was observed or checked with the compatibility suite (`test/compat`) or
 
 These change the result in both runtimes, in the same way.
 
-- **Unused names were matched by name only.** TidyJS read the name quoted in "'x' is declared but its value is never read" and removed any import with that name. When another declaration had the same name and was unused, for example a parameter `format` not used yet, the used `import { format } from 'date-fns'` was removed and the file stopped compiling. This was reproduced in VS Code 1.140 with the 1.9.2 engine on `apps/paye/src/@app/dossier/providers/reglements/ReglementFormProvider.ts` (`error TS2552: Cannot find name 'format'`). A diagnostic now counts only if its position falls inside the import declaration that binds the name. The VS Code adapter converts each diagnostic range to an offset, the CLI keeps TypeScript's `start` and converts the line and character of oxlint. A diagnostic without position is ignored, which can only remove less.
+- **Unused names were matched by name only.** TidyJS read the name quoted in "'x' is declared but its value is never read" and removed any import with that name. When another declaration had the same name and was unused, for example a parameter `format` not used yet, the used `import { format } from 'date-fns'` was removed and the file stopped compiling. This was reproduced in VS Code 1.140 with the 1.9.2 engine on `apps/paye/src/@app/dossier/providers/reglements/ReglementFormProvider.ts` (`error TS2552: Cannot find name 'format'`). A diagnostic now counts only if its position falls inside the import declaration that binds the name. The VS Code adapter converts each diagnostic range to an offset, the CLI keeps TypeScript's `start` and converts the line and column of ESLint and the line and character of oxlint. A diagnostic without position is ignored, which can only remove less.
 
 - **Parser cache key.** The parser was recreated only when `JSON.stringify(config)` changed, which turns every regular expression into `{}`. Editing only a `match` in a config file kept the old grouping until a reload. The shared cache now serializes regular expressions.
 - **tsconfig reading for path aliases.** Comments were stripped with a regular expression that took `/*` inside a string such as `"@app/*"` for the start of a block comment. When a later string contained `*/`, as `"src/**/*.ts"` does, the JSON was corrupted and every alias was silently ignored. The file is now parsed as JSONC, and `extends`, `baseUrl` and `paths` follow TypeScript's rules. The tsconfig files of Yeap-UI-Apps were already read correctly and give the same mappings.
@@ -171,7 +175,7 @@ These change the result in both runtimes, in the same way.
 
 ## 7. Compatibility suite
 
-`test/compat/fixtures/workspace` is a small project with its own `tsconfig.json`, oxlint configuration, root and nested TidyJS configurations, `.vscode/settings.json`, and files covering default, named, type, side-effect and namespace imports, comments, aliases, unused imports, missing modules, TS, TSX, JS and JSX, a syntax error, an invalid configuration, the ignore pragma, an excluded folder, an import after code and post-processing.
+`test/compat/fixtures/workspace` is a small project with its own `tsconfig.json`, oxlint configuration (ESLint is covered by `test/compat/cli-eslint.test.ts`), root and nested TidyJS configurations, `.vscode/settings.json`, and files covering default, named, type, side-effect and namespace imports, comments, aliases, unused imports, missing modules, TS, TSX, JS and JSX, a syntax error, an invalid configuration, the ignore pragma, an excluded folder, an import after code and post-processing.
 
 - `npm run test:compat:record` starts VS Code with the extension built from the repository and the oxc extension, opens each file, waits until its diagnostics are stable, runs **Format Document** and stores the result in `test/compat/expected`, with the diagnostics VS Code had (`vscode-report.json`). VS Code is pointed at the project's TypeScript so both runtimes use the same version.
 - `npm test` runs the built CLI on a copy of the fixtures and compares every file with the recording. A file may differ only if `test/compat/divergences.json` lists it with its cause; the test fails if an undocumented difference appears or a documented one disappears.
@@ -190,18 +194,18 @@ With TypeScript 6 the floor is the program build (about 2 s for `apps/paye`) and
 
 ## 9. Fast import analysis
 
-`src/cli/import-oracle.ts` decides, for most files, what the TypeScript checker and oxlint would report about imports, without running either of them.
+`src/cli/import-oracle.ts` decides, for most files, what the TypeScript checker and the linters would report about imports, without running any of them.
 
 - **References** come from `@typescript-eslint/scope-manager`, the scope analysis of typescript-eslint, run with no JSX pragma so that only written references count. It runs on the syntax tree of `oxc-parser` rather than `@typescript-eslint/typescript-estree`: on the 1,976 files of Yeap-UI-Apps, import bindings, reference counts, writes, positions, JSX presence and JSDoc words are identical, and the CLI no longer loads a second copy of TypeScript to parse.
-- **Unused imports.** An import with a reference is used for TypeScript and for oxlint. An import without reference makes TypeScript report `6133` at the import, unless one of the exceptions below applies, so the union read by the editor marks it unused whatever oxlint says. oxlint never has to run.
+- **Unused imports.** An import with a reference is used for TypeScript and for the linters. An import without reference makes TypeScript report `6133` at the import, unless one of the exceptions below applies, so the union read by the editor marks it unused whatever the linters say. The linters never have to run.
 - **Missing modules.** `ts.resolveModuleName` with the project's options and the resolution mode of the import decides resolution. An unresolved specifier covered by an ambient `declare module` (root declaration files, `types`, and the files they reference) is not missing. Anything else is not decided.
 - **Exceptions**, each checked against TypeScript 5.9 and 6.0, fall back in two stages.
-  - **File-only analysis**, when every module resolves: declaration files; `@ts-check` and `@ts-nocheck`; `noCheck`; JavaScript files with `checkJs: false`; TypeScript suggestions disabled without `noUnusedLocals`; a multi-binding import entirely unused (TypeScript reports `6192` without names, so oxlint decides); a name inside `{@link}` (TypeScript files) or any JSDoc braces (JavaScript files); the JSX factory in classic JSX mode; an import that is reassigned. A language service holding only that file (`noResolve`, `noLib`, `types: []`, the project's other options) gives TypeScript's unused-name diagnostics, the only ones kept, and the project's oxlint lints the file. Whether a name is used never depends on another file, so these diagnostics match the whole program; missing modules cannot occur because every module resolved. With only `removeMissingModules`, nothing has to run.
+  - **File-only analysis**, when every module resolves: declaration files; `@ts-check` and `@ts-nocheck`; `noCheck`; JavaScript files with `checkJs: false`; TypeScript suggestions disabled without `noUnusedLocals`; a multi-binding import entirely unused (TypeScript reports `6192` without names, so the linters decide); a name inside `{@link}` (TypeScript files) or any JSDoc braces (JavaScript files); the JSX factory in classic JSX mode; an import that is reassigned. A language service holding only that file (`noResolve`, `noLib`, `types: []`, the project's other options) gives TypeScript's unused-name diagnostics, the only ones kept, and the project's linters lint the file. Whether a name is used never depends on another file, so these diagnostics match the whole program; missing modules cannot occur because every module resolved. With only `removeMissingModules`, nothing has to run.
   - **Full analysis**: a module that does not resolve, a parse error, or `emitDecoratorMetadata` with decorators in the file, where the decision depends on the types of the imports.
 
 Validation: on all 1,976 files of `apps/paye`, `apps/pdf` and `packages/ds`, with and without injected defects, the CLI produced byte-identical files with and without `--no-fast-analysis`. The file-only stage was checked the same way on 200 files of Yeap-UI-Apps, each injected in turn with a `{@link}` to an otherwise unused import, a multi-binding import entirely unused, `@ts-nocheck`, and a reassigned import: 200 identical files for each injection. The compatibility fixtures and the 20, 40 and 200-file recordings from VS Code match in both modes.
 
-Repeated with oxlint instead of ESLint, on the 1,455 TypeScript files of `apps/paye` from the default branch of Yeap-UI-Apps, 145 of them injected with an unused `react` import and an import of a missing module: the CLI produced 0 differing files with and without `--no-fast-analysis`, and removed all 145 injected defects in both modes. The compatibility fixtures were recorded again in VS Code 1.141.1 with the oxc extension 1.63.0 and oxlint 1.88.0: the formatted files are identical to the ones recorded with the ESLint extension, and the CLI matches them in the four configurations of the suite.
+Repeated with oxlint instead of ESLint, on the 1,455 TypeScript files of `apps/paye` from the default branch of Yeap-UI-Apps, 145 of them injected with an unused `react` import and an import of a missing module: the CLI produced 0 differing files with and without `--no-fast-analysis`, and removed all 145 injected defects in both modes. The compatibility fixtures were recorded again in VS Code 1.141.1 with the oxc extension 1.63.0 and oxlint 1.88.0: the formatted files are identical to the ones recorded with the ESLint extension, and the CLI matches them in the four configurations of the suite. With ESLint installed but not configured next to oxlint, as on the default branch of Yeap-UI-Apps, the same 1,455 files again give 0 differing files between the two modes.
 
 The fast analysis reads `tsconfig.json` through `src/cli/tsconfig-cache.ts`. It parses the configuration with a host that records every file read, every file found missing and every folder walked by TypeScript's own file matcher (`ts.matchFiles`, an internal function; without it the cache is off), and stores the options, file list and references in the system temporary folder. A later run reuses them only if every recorded file and folder keeps its modification time and size and every missing file is still missing. A file added, removed or renamed changes the modification time of its folder. The full analysis always parses the configuration again.
 
@@ -210,6 +214,7 @@ The fast analysis reads `tsconfig.json` through `src/cli/tsconfig-cache.ts`. It 
 ```text
 tidyjs ──┬── main process: config, TypeScript (classic API or TypeScript 7 native API), formatting
          ├── oxlint language server process: the project's `oxlint --lsp`, started by the first file that needs it, linting while TypeScript checks
+         ├── ESLint host process: the project's ESLint, started by the first file that needs it (at launch with --no-fast-analysis), linting while TypeScript checks
          └── worker processes (--jobs): each one runs the two lines above on a contiguous slice of the files
 ```
 
@@ -218,14 +223,14 @@ Every optimization keeps the result identical; each one was checked with the com
 | Optimization | Why it is exact |
 |---|---|
 | No analysis for files without imports | The analysis only filters imports. |
-| oxlint in its own process, in parallel with TypeScript | Same oxlint, same configuration, same server as the editor runs; it lints the text of the file, not a copy on disk. |
-| oxlint skipped when only `removeMissingModules` is on and TypeScript reports no missing module | oxlint diagnostics are then only used for the unused names of missing modules. |
+| The linters in their own processes, in parallel with TypeScript | Same oxlint server and same ESLint, same configuration and working directory as the editor; `process.chdir` stays possible for ESLint because it is a process, not a thread, and both lint the text of the file, not a copy on disk. |
+| Linters skipped when only `removeMissingModules` is on and TypeScript reports no missing module | Linter diagnostics are then only used for the unused names of missing modules. |
 | Worker processes | Files are independent: each file's diagnostics depend on the project and on that file only. |
 | TypeScript 7 native API when the project uses TypeScript 7 | It is the compiler the project uses. |
 
 Options studied and rejected:
 
-- **Skipping the linter whenever TypeScript already reports some unused names.** The linter can report names TypeScript considers used, for example names referenced only from `{@link}`, files with `// @ts-nocheck`, or a different `jsxPragma`. The fast import analysis (section 9) skips oxlint only when those cases are excluded.
+- **Skipping the linters whenever TypeScript already reports some unused names.** The linters can report names TypeScript considers used, for example names referenced only from `{@link}`, files with `// @ts-nocheck`, or a different `jsxPragma`. The fast import analysis (section 9) skips them only when those cases are excluded.
 - **A reduced TypeScript program** (the files to format, their imports, the declaration files and the files declaring globals). The diagnostics were identical on 96 files of Yeap-UI-Apps, but the program still loaded 3,087 of 3,226 files because the application's imports are densely connected: 1.5 s instead of 2.0 s, not worth the risk.
 - **`bun check`** (Bun 1.4.3 canary, a port of typescript-go). It checked all of `apps/paye` in 2.2 s, and with `--noUnusedLocals --noUnusedParameters` it reported the same unused and missing-module diagnostics as the TypeScript 6 language service on those files. It is not used: it only reports what `tsc` reports, so JavaScript files without `checkJs` and files outside a `tsconfig.json` get no unused-name diagnostics while the editor gets them as suggestions; its output is text meant for humans, not an API; it requires a canary runtime; and on these runs ESLint, which the CLI used then, not TypeScript, was the remaining bottleneck with TypeScript 7.
 - **More than two workers with TypeScript 6.** Each worker type-checks the declarations shared by its files again. On 1,124 files, four workers used 2.4 times the CPU for a smaller gain than two.

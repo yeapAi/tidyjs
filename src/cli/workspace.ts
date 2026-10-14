@@ -14,6 +14,7 @@ import {
 
 import type { ParseError } from 'jsonc-parser';
 import type { ConfigResolutionContext, SettingsReader } from '../core/config';
+import type { LinterName } from './linter';
 import type { SettingsTree } from '../core/settings';
 
 const WORKSPACE_MARKERS = ['.git', '.vscode'];
@@ -32,9 +33,10 @@ export interface CliWorkspace {
     settingsWarning?: string;
     settings: SettingsTree;
     tidyjsSettings: SettingsReader;
+    eslintSettings: SettingsReader;
     oxcSettings: SettingsReader;
     fileSources: FileConfigSources;
-    oxlintFixAllOnSave(filePath: string): boolean;
+    fixAllOnSave(linter: LinterName, filePath: string): boolean;
     rootFor(filePath: string): string | undefined;
     resolutionContext(filePath: string): ConfigResolutionContext;
 }
@@ -114,15 +116,23 @@ function isCodeActionEnabled(value: unknown): boolean {
     return value === true || value === 'explicit' || value === 'always';
 }
 
-export function codeActionsRunOxlintFixAll(codeActionsOnSave: unknown): boolean {
+function codeActionsRunFixAll(codeActionsOnSave: unknown, kind: string): boolean {
     if (Array.isArray(codeActionsOnSave)) {
-        return codeActionsOnSave.includes('source.fixAll.oxc') || codeActionsOnSave.includes('source.fixAll');
+        return codeActionsOnSave.includes(kind) || codeActionsOnSave.includes('source.fixAll');
     }
     if (typeof codeActionsOnSave !== 'object' || codeActionsOnSave === null) {
         return false;
     }
     const kinds = codeActionsOnSave as Record<string, unknown>;
-    return 'source.fixAll.oxc' in kinds ? isCodeActionEnabled(kinds['source.fixAll.oxc']) : isCodeActionEnabled(kinds['source.fixAll']);
+    return kind in kinds ? isCodeActionEnabled(kinds[kind]) : isCodeActionEnabled(kinds['source.fixAll']);
+}
+
+export function codeActionsRunEslintFixAll(codeActionsOnSave: unknown): boolean {
+    return codeActionsRunFixAll(codeActionsOnSave, 'source.fixAll.eslint');
+}
+
+export function codeActionsRunOxlintFixAll(codeActionsOnSave: unknown): boolean {
+    return codeActionsRunFixAll(codeActionsOnSave, 'source.fixAll.oxc');
 }
 
 function mergeCodeActions(general: unknown, language: unknown): unknown {
@@ -138,6 +148,7 @@ export function createCliWorkspace(root: string, packageJson: unknown): CliWorks
     const defaults = settingsTreeFromFlatEntries(contributedDefaults(packageJson));
     const settings = mergeSettingsTrees(defaults, loaded.tree);
     const tidyjsSettings = createSettingsReader(getSettingsSection(settings, 'tidyjs'));
+    const eslintSettings = createSettingsReader(getSettingsSection(settings, 'eslint'));
     const oxcSettings = createFlatSettingsReader('oxc', loaded.flatEntries);
     const codeActionsOnSave = createSettingsReader(getSettingsSection(settings, 'editor')).get<unknown>('codeActionsOnSave');
     const fileSources = new FileConfigSources();
@@ -149,9 +160,10 @@ export function createCliWorkspace(root: string, packageJson: unknown): CliWorks
         settingsWarning: loaded.warning,
         settings,
         tidyjsSettings,
+        eslintSettings,
         oxcSettings,
         fileSources,
-        oxlintFixAllOnSave: (filePath) => codeActionsRunOxlintFixAll(mergeCodeActions(
+        fixAllOnSave: (linter, filePath) => (linter === 'oxlint' ? codeActionsRunOxlintFixAll : codeActionsRunEslintFixAll)(mergeCodeActions(
             codeActionsOnSave,
             loaded.languageOverrides[languageIdFor(filePath)]?.['editor.codeActionsOnSave']
         )),

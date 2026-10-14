@@ -121,6 +121,82 @@ describe('oxlint diagnostics through the built CLI', () => {
         expect(run().output).toBe(WITHOUT_UNUSED);
     });
 
+    test('ESLint installed without configuration stays silent next to oxlint', () => {
+        setup({ oxlintConfig: UNUSED_CONFIG });
+        const result = run();
+
+        expect(result.stdout).toContain('eslint: unavailable (not-configured');
+        expect(result.stdout).toContain('oxlint: used (linted');
+        expect(result.stderr).not.toContain('warning');
+        expect(result.output).toBe(WITHOUT_UNUSED);
+    });
+
+    describe('with oxlint and ESLint both configured', () => {
+        const ESLINT_TYPE_IMPORTS = `import tseslint from 'typescript-eslint';
+export default [{
+    files: ['**/*.ts'],
+    languageOptions: { parser: tseslint.parser },
+    plugins: { '@typescript-eslint': tseslint.plugin },
+    rules: { '@typescript-eslint/consistent-type-imports': 'error', '@typescript-eslint/no-unused-vars': 'warn' },
+}];
+`;
+        const BOTH_SOURCE = "import { Stats, statSync } from 'fs';\nimport { join } from 'path';\n\nvar count = 1;\nexport const stat = (file: string): Stats => statSync(file);\nexport const total = count;\n";
+
+        function runBoth(settings: Record<string, unknown>, extraArgs: string[] = []): ReturnType<typeof run> {
+            setup({
+                oxlintConfig: { rules: { 'no-var': 'error', 'no-unused-vars': 'off' } },
+                files: { 'eslint.config.mjs': ESLINT_TYPE_IMPORTS },
+                settings,
+            });
+            write('src/a.ts', BOTH_SOURCE);
+            return run(extraArgs);
+        }
+
+        test('the diagnostics of both linters are used', () => {
+            const result = runBoth({}, ['--no-fast-analysis']);
+
+            expect(result.stdout).toContain('oxlint: used (linted');
+            expect(result.stdout).toContain('eslint: used (linted');
+            expect(result.stdout).toContain('unused names: join');
+            expect(result.output).not.toContain("from 'path'");
+        });
+
+        test('source.fixAll applies the fixes of both linters', () => {
+            const result = runBoth({ 'editor.codeActionsOnSave': { 'source.fixAll': 'explicit' } });
+
+            expect(result.stdout).toContain('oxlint fixes: applied');
+            expect(result.stdout).toContain('eslint fixes: applied');
+            expect(result.output).toContain('import type { Stats }');
+            expect(result.output).toContain('const count = 1;');
+        });
+
+        test.each([
+            ['source.fixAll.oxc', 'oxlint', 'const count = 1;', /import \{\s*Stats,/],
+            ['source.fixAll.eslint', 'eslint', 'var count = 1;', /import type \{ Stats \}/],
+        ])('%s applies only the fixes of %s', (kind, linter, expectedLine, expectedImport) => {
+            const result = runBoth({ 'editor.codeActionsOnSave': { [kind]: 'explicit' } });
+
+            expect(result.stdout).toContain(`${linter} fixes: applied`);
+            expect(result.stdout).not.toContain(linter === 'oxlint' ? 'eslint fixes' : 'oxlint fixes');
+            expect(result.output).toContain(expectedLine);
+            expect(result.output).toMatch(expectedImport);
+        });
+
+        test('--no-oxlint leaves ESLint alone to work', () => {
+            setup({
+                oxlintConfig: { rules: { 'no-var': 'error' } },
+                files: { 'eslint.config.mjs': ESLINT_TYPE_IMPORTS },
+                settings: { 'editor.codeActionsOnSave': { 'source.fixAll': 'explicit' } },
+            });
+            write('src/a.ts', BOTH_SOURCE);
+            const result = run(['--no-oxlint']);
+
+            expect(result.stdout).not.toContain('oxlint');
+            expect(result.stdout).toContain('eslint fixes: applied');
+            expect(result.output).toContain('var count = 1;');
+        });
+    });
+
     describe('oxlint fixes on save', () => {
         function runWithTypeSource(settings: Record<string, unknown>): ReturnType<typeof run> {
             setup({ oxlintConfig: FIX_CONFIG, settings });

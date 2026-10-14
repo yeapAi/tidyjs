@@ -131,7 +131,7 @@ const cliConfig = {
     target: ['node20'],
     outfile: 'dist/cli-main.js',
     mainFields: ['module', 'main'],
-    external: ['typescript'],
+    external: ['typescript', 'eslint'],
     banner: { js: "#!/usr/bin/env node\nimport { createRequire as __tidyjsCreateRequire } from 'module';\nconst require = __tidyjsCreateRequire(import.meta.url);" },
     define: {
         TIDYJS_PACKAGE: JSON.stringify({
