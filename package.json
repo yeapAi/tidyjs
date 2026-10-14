@@ -2,7 +2,7 @@
   "name": "tidyjs",
   "displayName": "TidyJS",
   "description": "Automatically organizes and formats import declarations",
-  "version": "2.0.1",
+  "version": "2.0.3",
   "publisher": "Asmir",
   "license": "MIT",
   "icon": "resources/small.png",
@@ -32,6 +32,11 @@
       {
         "command": "tidyjs.forceFormatDocument",
         "title": "Format Imports",
+        "category": "TidyJS"
+      },
+      {
+        "command": "tidyjs.checkForUpdates",
+        "title": "Check for Updates",
         "category": "TidyJS"
       },
       {
@@ -74,6 +79,11 @@
           "type": "boolean",
           "default": false,
           "description": "Enable debug logging"
+        },
+        "tidyjs.autoUpdate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check the GitHub releases of yeapAi/tidyjs once a day and install new versions automatically. Reload the window to use an installed version."
         },
         "tidyjs.groups": {
           "type": "array",
