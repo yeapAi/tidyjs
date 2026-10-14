@@ -6,7 +6,7 @@ How the two runtimes relate, and where they can differ, is described in [cli-arc
 
 ## Requirements
 
-- Node.js 20 or later.
+- Node.js 20.19 or later, or 22.12 or later.
 - The `oxc-parser` native binding for the current platform. The build copies the binding installed on the build machine into `dist/`, as for the extension, so a `.vsix` built on Apple Silicon only runs there.
 - TypeScript, used only when `removeUnusedImports` or `removeMissingModules` is enabled. The project's own `typescript` package is used, so the diagnostics come from the version the project builds with. Without it, a warning is printed and nothing is removed; in a checkout of this repository, its own `typescript` is the fallback.
 - oxlint and ESLint, both optional. Each one is always taken from the project, never from TidyJS, because the project's configuration lives there. oxlint is `node_modules/oxlint`, searched from the workspace root, then from the folder of the file, or `oxc.path.oxlint`; the CLI runs its language server, `oxlint --lsp`, which is what the oxc extension runs. ESLint is loaded through its Node API.

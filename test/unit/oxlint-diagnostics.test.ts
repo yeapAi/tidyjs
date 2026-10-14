@@ -65,6 +65,14 @@ describe('readOxlintEditorSettings', () => {
         expect(settings({ fixKind: 'safe_fix', flags: { fix_kind: 'dangerous_fix' } }).server.fixKind).toBe('safe_fix');
     });
 
+    test('an explicit disableNestedConfig wins over the legacy flag, in both directions', () => {
+        expect(settings({ disableNestedConfig: false, flags: { disable_nested_config: 'true' } }).server).toMatchObject({
+            disableNestedConfig: false,
+            flags: { disable_nested_config: 'false' },
+        });
+        expect(settings({ disableNestedConfig: true, flags: { disable_nested_config: 'false' } }).server.disableNestedConfig).toBe(true);
+    });
+
     test('oxc.enable.oxlint wins over the master toggle oxc.enable, which is read independently', () => {
         expect(settings({ enable: false }).enable).toBe(false);
         expect(settings({ enable: false, 'enable.oxlint': true }).enable).toBe(true);
@@ -169,6 +177,7 @@ function handle(message) {
             initializationOptions = message.params.initializationOptions;
             return send({ id: message.id, result: { capabilities: {} } });
         case 'initialized':
+            send({ method: '$/progress' });
             send({ method: 'window/showMessage', params: { type: 1, message: 'Failed to parse config file.\\nEOF while parsing' } });
             send({ method: 'window/showMessage', params: { type: 3, message: 'Not an error' } });
             return send({ id: nextId++, method: 'workspace/configuration', params: { items: [{ scopeUri: 'file:///x', section: 'oxc_language_server' }, { scopeUri: 'file:///x', section: 'other' }] } });
@@ -358,7 +367,14 @@ describe('OxlintDiagnosticsProvider with a fake oxlint', () => {
     test('applies the source.fixAll.oxc edits and ignores the other actions', async () => {
         const result = await providerFor().fixAll(fileIn(directory), 'var a = 1;\nvar b = 2;\n', directory);
 
-        expect(result).toEqual({ status: 'linted', output: 'let a = 1;\nlet b = 2;\n', workingDirectory: directory });
+        expect(result).toEqual({ status: 'linted', output: 'let a = 1;\nlet b = 2;\n', warnings: ['Failed to parse config file. EOF while parsing'], workingDirectory: directory });
+    });
+
+    test('hands the error messages of the server to the fixes too, once', async () => {
+        const linter = providerFor();
+
+        expect((await linter.fixAll(fileIn(directory), 'let a = 1;\n', directory)).warnings).toEqual(['Failed to parse config file. EOF while parsing']);
+        expect((await linter.fixAll(fileIn(directory, 'src/b.ts'), 'let a = 1;\n', directory)).warnings).toEqual([]);
     });
 
     test('applies the edits sent as document changes', async () => {

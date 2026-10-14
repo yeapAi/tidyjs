@@ -14,6 +14,7 @@ export interface LinterLintResult {
 export interface LinterFixResult {
     status: LinterFileStatus;
     output?: string;
+    warnings?: string[];
     workingDirectory?: string;
 }
 

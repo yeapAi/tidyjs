@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
+import type { Linter } from '../../src/cli/linter';
 import { FileRunner } from '../../src/cli/runner';
 import { createCliWorkspace } from '../../src/cli/workspace';
 
@@ -34,6 +35,25 @@ describe('FileRunner', () => {
         expect(getSource.mock.calls.length).toBe(callsForFirstFile);
         expect(first.configPath).toBe(path.join(root, 'tidyjs.json'));
         expect(second.configPath).toBe(path.join(root, 'tidyjs.json'));
+        runner.dispose();
+    });
+
+    test('reports the warnings of a linter that only applied its fixes', async () => {
+        const filePath = path.join(root, 'a.ts');
+        fs.writeFileSync(filePath, "import { a } from 'a';\n");
+        const workspace = createCliWorkspace(root, packageJson);
+        jest.spyOn(workspace, 'fixAllOnSave').mockReturnValue(true);
+        const linter: Linter = {
+            name: 'oxlint',
+            lint: jest.fn(),
+            fixAll: jest.fn().mockResolvedValue({ status: 'linted', output: "import { a } from 'a';\n", warnings: ['Failed to parse config file.'] }),
+            dispose: jest.fn(),
+        };
+        const runner = new FileRunner(workspace, undefined, { mode: 'list', profile: 'editor', keepContents: false }, [linter]);
+
+        const report = await runner.run(filePath);
+
+        expect(report.warnings).toEqual(['oxlint: Failed to parse config file.']);
         runner.dispose();
     });
 });

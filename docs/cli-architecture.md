@@ -76,7 +76,7 @@ The parser then drops whole imports whose source is missing and individual speci
 | Reliability | Deterministic: diagnostics are computed, not awaited | Depends on server readiness; the 1.9.2 parity bench needed waits for both TypeScript and the linter | As A, plus B's flakiness when enabled |
 | Performance | One program per tsconfig, reused across files | Electron start, extension host, project load for every run | As A |
 | Installation | `typescript`, `oxlint` and `eslint` from the project | VS Code binary, a display server on Linux CI, oxc extension installed in the test profile | Both |
-| Portability | Any Node 20+ platform supported by `oxc-parser` | Electron platforms only; headless Linux needs `xvfb` | Both |
+| Portability | Any Node 20.19+ or 22.12+ platform supported by `oxc-parser` | Electron platforms only; headless Linux needs `xvfb` | Both |
 | Reproducibility | Same inputs, same output | Depends on profile, extensions and timing | Mixed |
 | CI/CD | Native | Heavy and fragile | Optional |
 | Complexity | Project selection and ESLint working directory to reproduce, and an oxlint server to drive | Process control, IPC, timeouts | Highest |

@@ -72,7 +72,7 @@ export function readOxlintEditorSettings(reader: SettingsReader): OxlintEditorSe
     const flags = reader.get<unknown>('flags');
     const flagValues = typeof flags === 'object' && flags !== null && !Array.isArray(flags) ? flags as Record<string, unknown> : {};
     const fixKind = asString(reader.get('fixKind')) ?? asString(flagValues.fix_kind);
-    const disableNestedConfig = asBoolean(reader.get('disableNestedConfig')) === true || flagValues.disable_nested_config === 'true';
+    const disableNestedConfig = asBoolean(reader.get('disableNestedConfig')) ?? flagValues.disable_nested_config === 'true';
 
     return {
         enable: asBoolean(reader.get('enable.oxlint')) ?? asBoolean(reader.get('enable')) ?? true,
@@ -172,8 +172,11 @@ class OxlintServer {
             }
             return null;
         }, (method, params) => {
+            if (method !== 'window/showMessage') {
+                return;
+            }
             const { type, message } = params as { type?: number; message?: string };
-            if (method === 'window/showMessage' && type === SHOW_MESSAGE_ERROR && message) {
+            if (type === SHOW_MESSAGE_ERROR && message) {
                 notices.push(message.replace(/\s*\n\s*/g, ' '));
             }
         });
@@ -309,8 +312,9 @@ export class OxlintDiagnosticsProvider implements Linter {
         }
 
         try {
-            const output = await (await this.serverFor(executable, workingDirectory)).fixAll(filePath, text);
-            return { status: 'linted', output, workingDirectory };
+            const server = await this.serverFor(executable, workingDirectory);
+            const output = await server.fixAll(filePath, text);
+            return { status: 'linted', output, warnings: server.takeNotices(), workingDirectory };
         } catch (error) {
             throw new DiagnosticsUnavailableError('oxlint', `oxlint fixes failed: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`);
         }

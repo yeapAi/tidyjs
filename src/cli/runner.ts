@@ -207,7 +207,10 @@ export class FileRunner {
         let text = original;
         for (const linter of fixers) {
             try {
-                const { output } = await linter.fixAll(filePath, text, workspaceRoot);
+                const { output, warnings } = await linter.fixAll(filePath, text, workspaceRoot);
+                for (const warning of warnings ?? []) {
+                    report.warnings.push(`${linter.name}: ${warning}`);
+                }
                 const fixed = output ?? text;
                 (report.fixes ??= []).push({ linter: linter.name, result: fixed !== text ? 'applied' : 'none' });
                 text = fixed;
