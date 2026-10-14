@@ -10,10 +10,10 @@ This fork of TidyJS is not published on the Marketplace. Its `.vsix` is built by
 - The file is never installed if any check fails:
   - the release is a draft or a prerelease, or its tag is not `vX.Y.Z`, or its version is not newer (no downgrade);
   - the package is not named `tidyjs-<version>.vsix` or is not hosted at `https://github.com/yeapAi/tidyjs/releases/download/<tag>/`;
-  - the downloaded size differs from the size GitHub announces, the file is not a zip archive, or its SHA-256 differs from the digest GitHub publishes for the asset;
-  - the package carries no native binding (`parser.<platform>-<arch>.node`) for the machine, which keeps a build made on Apple Silicon from replacing a working install on another platform.
+  - the downloaded size differs from the size GitHub announces, or its SHA-256 differs from the digest GitHub publishes for the asset;
+  - the file is not a valid zip archive (its central directory is read and every entry must have its local header), has no `extension/package.json`, or has no `extension/dist/parser.<platform>-<arch>*.node` entry for the machine, which keeps a build made on Apple Silicon from replacing a working install on another platform.
 - A failure is written to the TidyJS output channel, not shown, and the next attempt is a day later.
-- Nothing runs when the extension is started from a checkout (Extension Development Host) or in tests.
+- Nothing runs when the extension is started from a checkout (Extension Development Host) or in tests, the command included: it then only says so.
 
 ## Settings and command
 

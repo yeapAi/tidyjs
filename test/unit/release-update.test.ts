@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
-import { isNewerVersion, parseVersion, selectUpdate, verifyVsix } from '../../src/core/release-update';
+import { isNewerVersion, listZipEntries, parseVersion, selectUpdate, verifyVsix } from '../../src/core/release-update';
+import { buildZip } from '../zip-fixture';
 
 import type { ReleaseInfo, UpdateCandidate } from '../../src/core/release-update';
 
@@ -95,16 +96,75 @@ describe('selectUpdate', () => {
     });
 });
 
+const MANIFEST: [string, string] = ['extension/package.json', '{}'];
+const BINDING: [string, string] = ['extension/dist/parser.darwin-arm64.node', 'binary'];
+
+describe('listZipEntries', () => {
+    test('lists the entries of the central directory', () => {
+        expect(listZipEntries(buildZip([MANIFEST, BINDING, ['extension/dist/extension.js', 'code']]))).toEqual([
+            'extension/package.json',
+            'extension/dist/parser.darwin-arm64.node',
+            'extension/dist/extension.js',
+        ]);
+    });
+
+    test('finds the end of the directory before an archive comment', () => {
+        const archive = buildZip([MANIFEST]);
+        const comment = Buffer.from('built by CI');
+        archive.writeUInt16LE(comment.length, archive.length - 2);
+
+        expect(listZipEntries(Buffer.concat([archive, comment]))).toEqual(['extension/package.json']);
+    });
+
+    test('works on a view that does not start at the beginning of its buffer', () => {
+        const archive = buildZip([MANIFEST, BINDING]);
+        const shifted = new Uint8Array(new ArrayBuffer(archive.length + 8), 8);
+        shifted.set(archive);
+
+        expect(listZipEntries(shifted)).toEqual(['extension/package.json', 'extension/dist/parser.darwin-arm64.node']);
+    });
+
+    test('reads an archive without entries', () => {
+        expect(listZipEntries(buildZip([]))).toEqual([]);
+    });
+
+    test.each([
+        ['an empty file', () => Buffer.alloc(0)],
+        ['text', () => Buffer.from('<html>rate limited</html>')],
+        ['an archive cut before its end', () => buildZip([MANIFEST, BINDING]).subarray(0, -10)],
+        ['an archive cut inside its entries', () => buildZip([MANIFEST, BINDING]).subarray(0, 40)],
+        ['an end record that announces more entries than the directory holds', () => {
+            const archive = buildZip([MANIFEST]);
+            archive.writeUInt16LE(2, archive.length - 12);
+            return archive;
+        }],
+        ['a directory that does not end where the end record says', () => {
+            const archive = buildZip([MANIFEST]);
+            archive.writeUInt32LE(archive.readUInt32LE(archive.length - 10) + 1, archive.length - 10);
+            return archive;
+        }],
+        ['an entry whose local header is missing', () => {
+            const archive = buildZip([MANIFEST]);
+            archive.writeUInt32LE(0, 0);
+            return archive;
+        }],
+        ['a directory entry that points outside the archive', () => {
+            const archive = buildZip([MANIFEST]);
+            const central = archive.readUInt32LE(archive.length - 6);
+            archive.writeUInt32LE(archive.length, central + 42);
+            return archive;
+        }],
+    ])('rejects %s', (_label, make) => {
+        expect(listZipEntries(make())).toBeUndefined();
+    });
+});
+
 describe('verifyVsix', () => {
     const platform = 'darwin';
     const arch = 'arm64';
 
-    function vsix(): { content: Buffer; candidate: UpdateCandidate } {
-        const content = Buffer.concat([
-            Buffer.from([0x50, 0x4b, 0x03, 0x04]),
-            Buffer.from('extension/dist/parser.darwin-arm64.node'),
-            Buffer.from('payload'),
-        ]);
+    function vsix(entries: [string, string][] = [MANIFEST, BINDING]): { content: Buffer; candidate: UpdateCandidate } {
+        const content = buildZip(entries);
         return {
             content,
             candidate: {
@@ -117,7 +177,7 @@ describe('verifyVsix', () => {
         };
     }
 
-    test('accepts a zip of the announced size and digest that carries the native binding of the platform', () => {
+    test('accepts an archive of the announced size and digest that holds the manifest and the native binding of the platform', () => {
         const { content, candidate } = vsix();
 
         expect(verifyVsix(content, candidate, platform, arch)).toBeUndefined();
@@ -129,12 +189,10 @@ describe('verifyVsix', () => {
         expect(verifyVsix(content, { ...candidate, sha256: undefined }, platform, arch)).toBeUndefined();
     });
 
-    test('works on a view that does not start at the beginning of its buffer', () => {
-        const { content, candidate } = vsix();
-        const shifted = new Uint8Array(new ArrayBuffer(content.length + 8), 8);
-        shifted.set(content);
+    test('accepts the native binding of a platform whose file name has a suffix', () => {
+        const { content, candidate } = vsix([MANIFEST, ['extension/dist/parser.linux-x64-gnu.node', 'binary']]);
 
-        expect(verifyVsix(shifted, candidate, platform, arch)).toBeUndefined();
+        expect(verifyVsix(content, candidate, 'linux', 'x64')).toBeUndefined();
     });
 
     test('rejects a size that differs from the announced one', () => {
@@ -143,17 +201,36 @@ describe('verifyVsix', () => {
         expect(verifyVsix(content, { ...candidate, size: candidate.size + 1 }, platform, arch)).toMatch(/expected \d+ bytes, received \d+/);
     });
 
-    test('rejects a file that is not a zip archive', () => {
-        const content = Buffer.from('<html>rate limited</html> parser.darwin-arm64');
-        const candidate = { ...vsix().candidate, size: content.length, sha256: undefined };
-
-        expect(verifyVsix(content, candidate, platform, arch)).toBe('the file is not a zip archive');
-    });
-
     test('rejects a digest that does not match', () => {
         const { content, candidate } = vsix();
 
         expect(verifyVsix(content, { ...candidate, sha256: 'c'.repeat(64) }, platform, arch)).toMatch(/SHA-256 digest does not match/);
+    });
+
+    test('rejects text, even when it starts like an archive and carries the name of the binding', () => {
+        const content = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.from('<html>rate limited</html> extension/dist/parser.darwin-arm64.node')]);
+        const candidate = { ...vsix().candidate, size: content.length, sha256: undefined };
+
+        expect(verifyVsix(content, candidate, platform, arch)).toBe('the file is not a valid zip archive');
+    });
+
+    test('rejects a truncated archive of the announced size when GitHub publishes no digest', () => {
+        const content = buildZip([MANIFEST, BINDING]).subarray(0, -5);
+        const candidate = { ...vsix().candidate, size: content.length, sha256: undefined };
+
+        expect(verifyVsix(content, candidate, platform, arch)).toBe('the file is not a valid zip archive');
+    });
+
+    test('rejects an archive that is not an extension package', () => {
+        const { content, candidate } = vsix([BINDING]);
+
+        expect(verifyVsix(content, candidate, platform, arch)).toBe('the archive has no extension/package.json');
+    });
+
+    test('rejects a package that only mentions the native binding in the content of a file', () => {
+        const { content, candidate } = vsix([MANIFEST, ['extension/dist/extension.js', './parser.darwin-arm64.node']]);
+
+        expect(verifyVsix(content, candidate, platform, arch)).toBe('the package has no native binding for darwin-arm64');
     });
 
     test('rejects a package built for another platform than the running one', () => {
@@ -161,5 +238,11 @@ describe('verifyVsix', () => {
 
         expect(verifyVsix(content, candidate, 'win32', 'x64')).toBe('the package has no native binding for win32-x64');
         expect(verifyVsix(content, candidate, 'darwin', 'x64')).toBe('the package has no native binding for darwin-x64');
+    });
+
+    test('rejects a binding stored outside the dist folder of the extension', () => {
+        const { content, candidate } = vsix([MANIFEST, ['other/parser.darwin-arm64.node', 'binary']]);
+
+        expect(verifyVsix(content, candidate, platform, arch)).toBe('the package has no native binding for darwin-arm64');
     });
 });

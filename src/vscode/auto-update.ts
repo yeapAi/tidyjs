@@ -17,7 +17,7 @@ const MAX_PACKAGE_BYTES = 50 * 1024 * 1024;
 const LAST_CHECK_KEY = 'tidyjs.autoUpdate.lastCheck';
 const USER_AGENT = 'tidyjs-vscode-extension';
 
-export type UpdateOutcome = 'up-to-date' | 'installed' | 'failed';
+export type UpdateOutcome = 'up-to-date' | 'installed' | 'failed' | 'skipped';
 
 export interface ReleaseSource {
     latestRelease(): Promise<ReleaseInfo>;
@@ -61,7 +61,7 @@ export class AutoUpdater implements Disposable {
     ) {}
 
     schedule(): void {
-        if (this.context.extensionMode !== ExtensionMode.Production) {
+        if (!this.isInstalledPackage()) {
             logDebug('Automatic update skipped: the extension is not running from an installed package');
             return;
         }
@@ -77,6 +77,13 @@ export class AutoUpdater implements Disposable {
     }
 
     async checkNow(interactive = true): Promise<UpdateOutcome> {
+        if (!this.isInstalledPackage()) {
+            logDebug('Update check skipped: the extension is not running from an installed package');
+            if (interactive) {
+                void window.showInformationMessage('TidyJS only updates itself when it runs from an installed package.');
+            }
+            return 'skipped';
+        }
         if (this.running) {
             return 'up-to-date';
         }
@@ -91,6 +98,10 @@ export class AutoUpdater implements Disposable {
 
     dispose(): void {
         clearTimeout(this.timer);
+    }
+
+    private isInstalledPackage(): boolean {
+        return this.context.extensionMode === ExtensionMode.Production;
     }
 
     private async checkAndInstall(interactive: boolean): Promise<UpdateOutcome> {

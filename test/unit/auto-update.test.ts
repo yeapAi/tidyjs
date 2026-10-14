@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { AutoUpdater } from '../../src/vscode/auto-update';
+import { buildZip } from '../zip-fixture';
 
 import type { ReleaseSource } from '../../src/vscode/auto-update';
 
@@ -31,10 +32,9 @@ const DAY = 24 * 60 * 60 * 1000;
 const NOW = 1_800_000_000_000;
 
 function fakeVsix(version: string): { content: Buffer; release: Awaited<ReturnType<ReleaseSource['latestRelease']>> } {
-    const content = Buffer.concat([
-        Buffer.from([0x50, 0x4b, 0x03, 0x04]),
-        Buffer.from(`extension/dist/parser.${process.platform}-${process.arch}.node`),
-        Buffer.from(`version ${version}`),
+    const content = buildZip([
+        ['extension/package.json', `{ "version": "${version}" }`],
+        [`extension/dist/parser.${process.platform}-${process.arch}.node`, `version ${version}`],
     ]);
     return {
         content,
@@ -159,6 +159,24 @@ describe('AutoUpdater', () => {
     });
 
     describe('checkNow', () => {
+        test.each([
+            ['in development', 2],
+            ['in a test host', 3],
+        ])('installs nothing %s, even when asked', async (_label, mode) => {
+            const { source: releases } = source('2.0.2');
+            const updater = new AutoUpdater(context({ mode }), releases, () => NOW);
+
+            expect(await updater.checkNow(true)).toBe('skipped');
+            expect(await updater.checkNow(false)).toBe('skipped');
+
+            expect(releases.latestRelease).not.toHaveBeenCalled();
+            expect(releases.download).not.toHaveBeenCalled();
+            expect(mockExecuteCommand).not.toHaveBeenCalled();
+            expect(mockShowInformationMessage).toHaveBeenCalledTimes(1);
+            expect(mockShowInformationMessage).toHaveBeenCalledWith('TidyJS only updates itself when it runs from an installed package.');
+            expect(state.has('tidyjs.autoUpdate.lastCheck')).toBe(false);
+        });
+
         test('installs a newer release through the VS Code command, then removes the downloaded package', async () => {
             const { source: releases, content } = source('2.0.2');
 
