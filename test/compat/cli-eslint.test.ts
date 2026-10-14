@@ -5,7 +5,7 @@ import * as path from 'path';
 
 const repoRoot = path.resolve(__dirname, '../..');
 const cliPath = path.join(repoRoot, 'dist/cli.js');
-const typescript7 = path.join(repoRoot, '.vscode-test/ts7/node_modules/typescript');
+const typescript7 = path.join(repoRoot, 'node_modules/@typescript/native');
 
 const ESLINT_CONFIG = `import tseslint from 'typescript-eslint';
 export default [{
@@ -137,7 +137,7 @@ describe('ESLint diagnostics through the built CLI', () => {
         test.each([
             ['fast import analysis', []],
             ['full analysis', ['--no-fast-analysis']],
-            ...fs.existsSync(path.join(typescript7, 'package.json')) ? [['TypeScript 7 native API', ['--typescript', typescript7]]] : [],
+            ['TypeScript 7 native API', ['--typescript', typescript7]],
         ] as [string, string[]][])('unused imports are found in the text fixed by ESLint, not in the file on disk (%s)', (_label, extraArgs) => {
             setup({ eslintConfig: FIX_CONFIG, settings: { 'editor.codeActionsOnSave': { 'source.fixAll.eslint': 'explicit' } } });
             write('src/a.ts', TYPE_SOURCE_WITH_UNUSED);

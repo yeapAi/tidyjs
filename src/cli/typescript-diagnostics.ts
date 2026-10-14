@@ -259,6 +259,8 @@ function nativeRuntimeFrom(packageDir: string): NativeRuntime {
     return { packageDir, version: packageJson.version };
 }
 
+const TYPESCRIPT_PACKAGE_NAMES = ['typescript', '@typescript/typescript6'];
+
 function resolveTypeScriptPackage(packageDir: string): ResolvedRuntime | null {
     const manifestPath = path.join(path.resolve(packageDir), 'package.json');
     let manifest: { name?: string; version?: string; main?: string };
@@ -267,7 +269,7 @@ function resolveTypeScriptPackage(packageDir: string): ResolvedRuntime | null {
     } catch {
         return null;
     }
-    if (manifest.name !== 'typescript' || !manifest.version) {
+    if (!manifest.name || !TYPESCRIPT_PACKAGE_NAMES.includes(manifest.name) || !manifest.version) {
         return null;
     }
     if (Number(manifest.version.split('.')[0]) >= 7) {

@@ -30,15 +30,13 @@ function runCli(cwd: string, args: string[]): { status: number | null; stdout: s
     return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
-const typescript7 = path.join(repoRoot, '.vscode-test/ts7/node_modules/typescript');
+const typescript7 = path.join(repoRoot, 'node_modules/@typescript/native');
 const variants: [string, string[]][] = [
     ['default options', []],
     ['three worker processes', ['--jobs', '3']],
     ['full TypeScript and ESLint analysis', ['--no-fast-analysis']],
+    ['TypeScript 7 native API', ['--typescript', typescript7]],
 ];
-if (fs.existsSync(path.join(typescript7, 'package.json'))) {
-    variants.push(['TypeScript 7 native API', ['--typescript', typescript7]]);
-}
 
 describe.each(variants)('CLI output matches the output recorded in VS Code (%s)', (_label, extraArgs) => {
     const recordedFiles = listFiles(path.join(expectedRoot, 'src')).map((file) => `src/${file}`).sort();
