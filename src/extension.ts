@@ -7,6 +7,7 @@ import { InvalidImport } from './parser';
 // VSCode
 import { Range, window, commands, TextEdit, workspace, languages, CancellationTokenSource, ProgressLocation, Uri } from 'vscode';
 import type { TextDocument, ExtensionContext, FormattingOptions, CancellationToken, DocumentFormattingEditProvider } from 'vscode';
+import { AutoUpdater } from './vscode/auto-update';
 import { configManager } from './vscode/config-manager';
 import { diagnosticsCache, getPublishedDiagnostics } from './vscode/diagnostics';
 import { createVSCodeLogSink } from './vscode/log-sink';
@@ -171,6 +172,10 @@ async function ensureExtensionEnabled(document?: import('vscode').TextDocument):
 export function activate(context: ExtensionContext): void {
     try {
         setLogSink(createVSCodeLogSink());
+
+        const autoUpdater = new AutoUpdater(context);
+        context.subscriptions.push(autoUpdater, commands.registerCommand('tidyjs.checkForUpdates', () => autoUpdater.checkNow()));
+        autoUpdater.schedule();
 
         // Initialize ConfigManager with context
         configManager.initialize(context);

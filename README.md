@@ -106,6 +106,7 @@ import * as Utils from './utils';
 | `TidyJS: Create Configuration File` | Create a `.tidyjsrc` configuration file |
 | `TidyJS: Sort Properties` | Sort properties in the current selection |
 | `TidyJS: Format Folder` | Format all files in a folder |
+| `TidyJS: Check for Updates` | Install the latest release now ([automatic updates](docs/auto-update.md)) |
 
 ## Documentation
 
