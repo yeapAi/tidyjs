@@ -51,7 +51,9 @@ interface InternalProcessedConfig {
     formatting: FormattingOptions;
 }
 
-const DEFAULT_PARSER_SETTINGS: InternalProcessedConfig = {
+const TOOL_DIRECTIVE_COMMENT = /^\/\/\s*@(?:(?:vitest|jest)-[\w-]+|ts-(?:nocheck|check)|jsx\w*|flow|refresh)\b/;
+
+const DEFAULT_PARSER_SETTINGS:InternalProcessedConfig = {
     formatting: {
         quoteStyle: 'single',
         semicolons: true,
@@ -852,6 +854,8 @@ export class ImportParser {
             if (line === '') {
                 // Empty line - could be separation or just spacing
                 continue;
+            } else if (TOOL_DIRECTIVE_COMMENT.test(line)) {
+                break;
             } else if (line.startsWith('//')) {
                 // Single-line comment - likely an import group comment
                 startLineIndex = i;
